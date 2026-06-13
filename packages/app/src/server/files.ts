@@ -6,6 +6,13 @@ import { Readable } from "node:stream";
 
 import mime from "mime";
 
+/** Public URL an uploaded file is served from (routes/api/files.ts). */
+export const fileUrl = (path: string) =>
+  `/api/files?fileId=${encodeURIComponent(path)}`;
+
+/** Shape of files.metadata (recorded at upload time). */
+export type FileMetadata = { name: string; type: string; size: number };
+
 /** Disk-backed file storage. File ids are `<uuid>.<ext>` so they're safe to
  *  use directly as path segments and the mime type can be re-derived when
  *  serving (see routes/api/files.ts). */

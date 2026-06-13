@@ -2,15 +2,16 @@ import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { auth } from "../auth";
 import { db } from "../db";
-import { fileService } from "../files";
+import {
+  fileService,
+  fileUrl,
+  type FileMetadata,
+} from "../files";
 import { authP, getAuthSession, t } from "./base";
-
-/** Public URL an uploaded file is served from (routes/api/files.ts). */
-const fileUrl = (path: string) =>
-  `/api/files?fileId=${encodeURIComponent(path)}`;
+import { boardRouter } from "./boards";
 
 export const appRouter = {
-  image: {
+  file: {
     upload: authP
       .input(
         z.object({
@@ -23,17 +24,23 @@ export const appRouter = {
                 "image/png",
                 "image/webp",
                 "image/svg+xml",
+                "application/pdf",
+                "text/plain",
+                "text/markdown",
+                "application/zip",
+                "audio/mpeg",
+                "video/mp4",
               ],
               "Unsupported file type",
             )
-            .max(5 * 1024 * 1024, "File size must be less than 5MB"),
+            .max(20 * 1024 * 1024, "File size must be less than 20MB"),
         }),
       )
       .handler(async (info) => {
         const filePath = await fileService.addFile(info.input.file);
 
         const { id } = await db
-          .insertInto("images")
+          .insertInto("files")
           .values({
             path: filePath,
             user_id: info.context.user.id,
@@ -49,26 +56,30 @@ export const appRouter = {
         return {
           id,
           path: filePath,
+          name: info.input.file.name,
+          type: info.input.file.type,
           url: fileUrl(filePath),
         };
       }),
 
-    /** The caller's uploaded images, newest first. */
+    /** The caller's uploads, newest first. */
     mine: authP.handler(async (info) => {
-      const images = await db
-        .selectFrom("images")
+      const files = await db
+        .selectFrom("files")
         .where("user_id", "=", info.context.user.id)
         .select(["id", "path", "metadata", "created_at"])
         .orderBy("created_at", "desc")
         .limit(50)
         .execute();
 
-      return images.map((img) => ({
-        ...img,
-        url: fileUrl(img.path),
+      return files.map((file) => ({
+        ...file,
+        metadata: file.metadata as FileMetadata,
+        url: fileUrl(file.path),
       }));
     }),
   },
+  board: boardRouter,
   auth: {
     getSession: t.handler(async (info) => {
       if (!info.context.reqHeaders) {

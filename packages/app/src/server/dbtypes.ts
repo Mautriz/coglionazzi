@@ -58,7 +58,7 @@ export interface Verifications {
   updated_at: Timestamp | null;
 }
 
-export interface Images {
+export interface Files {
   id: Generated<string>;
   path: string;
   /** JSON: { name, type, size } of the original upload. */
@@ -67,8 +67,44 @@ export interface Images {
   created_at: Generated<Timestamp>;
 }
 
+export interface Boards {
+  id: Generated<string>;
+  name: string;
+  created_by: string | null;
+  created_at: Generated<Timestamp>;
+}
+
+export interface BoardColumns {
+  id: Generated<string>;
+  board_id: string;
+  name: string;
+  position: number;
+}
+
+export interface Cards {
+  id: Generated<string>;
+  column_id: string;
+  title: string;
+  /** Serialized Lexical editor state (JSON). */
+  description: unknown | null;
+  tags: Generated<string[]>;
+  position: number;
+  created_by: string | null;
+  created_at: Generated<Timestamp>;
+}
+
+export interface CardAttachments {
+  card_id: string;
+  file_id: string;
+  created_at: Generated<Timestamp>;
+}
+
 export interface DB {
-  images: Images;
+  files: Files;
+  boards: Boards;
+  board_columns: BoardColumns;
+  cards: Cards;
+  card_attachments: CardAttachments;
   users: Users;
   sessions: Sessions;
   accounts: Accounts;

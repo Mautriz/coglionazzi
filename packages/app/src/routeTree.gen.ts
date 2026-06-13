@@ -13,9 +13,12 @@ import { Route as HomeRouteRouteImport } from './routes/home/route'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as HomeIndexRouteImport } from './routes/home/index'
+import { Route as HomeDemoRouteImport } from './routes/home/demo'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as HomeBoardsIndexRouteImport } from './routes/home/boards/index'
+import { Route as HomeBoardsBoardIdRouteImport } from './routes/home/boards/$boardId'
 import { Route as ApiRpcSplatRouteImport } from './routes/api/rpc/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
@@ -39,6 +42,11 @@ const HomeIndexRoute = HomeIndexRouteImport.update({
   path: '/',
   getParentRoute: () => HomeRouteRoute,
 } as any)
+const HomeDemoRoute = HomeDemoRouteImport.update({
+  id: '/demo',
+  path: '/demo',
+  getParentRoute: () => HomeRouteRoute,
+} as any)
 const AuthSignUpRoute = AuthSignUpRouteImport.update({
   id: '/sign-up',
   path: '/sign-up',
@@ -53,6 +61,16 @@ const ApiFilesRoute = ApiFilesRouteImport.update({
   id: '/api/files',
   path: '/api/files',
   getParentRoute: () => rootRouteImport,
+} as any)
+const HomeBoardsIndexRoute = HomeBoardsIndexRouteImport.update({
+  id: '/boards/',
+  path: '/boards/',
+  getParentRoute: () => HomeRouteRoute,
+} as any)
+const HomeBoardsBoardIdRoute = HomeBoardsBoardIdRouteImport.update({
+  id: '/boards/$boardId',
+  path: '/boards/$boardId',
+  getParentRoute: () => HomeRouteRoute,
 } as any)
 const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
   id: '/api/rpc/$',
@@ -72,9 +90,12 @@ export interface FileRoutesByFullPath {
   '/api/files': typeof ApiFilesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
+  '/home/demo': typeof HomeDemoRoute
   '/home/': typeof HomeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/home/boards/$boardId': typeof HomeBoardsBoardIdRoute
+  '/home/boards/': typeof HomeBoardsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -82,9 +103,12 @@ export interface FileRoutesByTo {
   '/api/files': typeof ApiFilesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
+  '/home/demo': typeof HomeDemoRoute
   '/home': typeof HomeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/home/boards/$boardId': typeof HomeBoardsBoardIdRoute
+  '/home/boards': typeof HomeBoardsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -94,9 +118,12 @@ export interface FileRoutesById {
   '/api/files': typeof ApiFilesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
+  '/home/demo': typeof HomeDemoRoute
   '/home/': typeof HomeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/home/boards/$boardId': typeof HomeBoardsBoardIdRoute
+  '/home/boards/': typeof HomeBoardsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -107,9 +134,12 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/auth/login'
     | '/auth/sign-up'
+    | '/home/demo'
     | '/home/'
     | '/api/auth/$'
     | '/api/rpc/$'
+    | '/home/boards/$boardId'
+    | '/home/boards/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -117,9 +147,12 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/auth/login'
     | '/auth/sign-up'
+    | '/home/demo'
     | '/home'
     | '/api/auth/$'
     | '/api/rpc/$'
+    | '/home/boards/$boardId'
+    | '/home/boards'
   id:
     | '__root__'
     | '/'
@@ -128,9 +161,12 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/auth/login'
     | '/auth/sign-up'
+    | '/home/demo'
     | '/home/'
     | '/api/auth/$'
     | '/api/rpc/$'
+    | '/home/boards/$boardId'
+    | '/home/boards/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -172,6 +208,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HomeIndexRouteImport
       parentRoute: typeof HomeRouteRoute
     }
+    '/home/demo': {
+      id: '/home/demo'
+      path: '/demo'
+      fullPath: '/home/demo'
+      preLoaderRoute: typeof HomeDemoRouteImport
+      parentRoute: typeof HomeRouteRoute
+    }
     '/auth/sign-up': {
       id: '/auth/sign-up'
       path: '/sign-up'
@@ -192,6 +235,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/files'
       preLoaderRoute: typeof ApiFilesRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/home/boards/': {
+      id: '/home/boards/'
+      path: '/boards'
+      fullPath: '/home/boards/'
+      preLoaderRoute: typeof HomeBoardsIndexRouteImport
+      parentRoute: typeof HomeRouteRoute
+    }
+    '/home/boards/$boardId': {
+      id: '/home/boards/$boardId'
+      path: '/boards/$boardId'
+      fullPath: '/home/boards/$boardId'
+      preLoaderRoute: typeof HomeBoardsBoardIdRouteImport
+      parentRoute: typeof HomeRouteRoute
     }
     '/api/rpc/$': {
       id: '/api/rpc/$'
@@ -225,11 +282,17 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
 )
 
 interface HomeRouteRouteChildren {
+  HomeDemoRoute: typeof HomeDemoRoute
   HomeIndexRoute: typeof HomeIndexRoute
+  HomeBoardsBoardIdRoute: typeof HomeBoardsBoardIdRoute
+  HomeBoardsIndexRoute: typeof HomeBoardsIndexRoute
 }
 
 const HomeRouteRouteChildren: HomeRouteRouteChildren = {
+  HomeDemoRoute: HomeDemoRoute,
   HomeIndexRoute: HomeIndexRoute,
+  HomeBoardsBoardIdRoute: HomeBoardsBoardIdRoute,
+  HomeBoardsIndexRoute: HomeBoardsIndexRoute,
 }
 
 const HomeRouteRouteWithChildren = HomeRouteRoute._addFileChildren(

@@ -39,9 +39,13 @@ packages/
         │   ├── __root.tsx         # head, theme init script, session beforeLoad
         │   ├── index.tsx          # redirects to /home or /auth/login
         │   ├── auth/              # public: route.tsx layout + login + sign-up
-        │   ├── home/              # protected: route.tsx guards on ctx.context.user
+        │   ├── home/              # protected: route.tsx = guard + topbar/nav layout
+        │   │   ├── index.tsx      # hub linking to the sections
+        │   │   ├── demo.tsx       # playground: editor + file uploads
+        │   │   └── boards/        # kanban: index list + $boardId board view
         │   └── api/
         │       ├── auth/$.ts      # better-auth handler (GET/POST)
+        │       ├── files.ts       # GET ?fileId= → streams an uploaded file
         │       └── rpc/$.ts       # oRPC RPCHandler (ANY), prefix /api/rpc
         ├── server/                # server-only code
         │   ├── db.ts              # pg Pool + Kysely instance + dialect
@@ -144,14 +148,33 @@ Run from repo root:
   must be registered in the `nodes` array AND themed (theme object in
   RichTextEditor + classes in `styles/editor.css`).
 
-### Images / file uploads
+### File uploads
 
-- Upload via `rpc.image.upload` (`{ file: File }`, auth required, ≤5MB,
-  image mime types only) → returns `{ id, path, url }`. List the caller's
-  images with `rpc.image.mine`. `<ImageUploads />` is the reference UI.
+- Upload via `rpc.file.upload` (`{ file: File }`, auth required, ≤20MB,
+  allowlisted mime types: images, pdf, text/markdown, zip, mp3, mp4) →
+  returns `{ id, path, name, type, url }`. List the caller's files with
+  `rpc.file.mine`. UI helpers in `~/components/custom/FileUploads`:
+  `<UploadButton onUploaded>`, `<FilePreview>` (image thumb / file chip)
+  and the `<FileUploads />` gallery.
 - Files live on disk at `IMAGES_PATH` (default `packages/app/data/images`,
   gitignored) and are served by `GET /api/files?fileId=…` with long cache.
-  The `images` table records path + metadata + uploader.
+  The `files` table records path + metadata (`{name,type,size}`) + uploader.
+
+### Kanban boards
+
+- Schema: `boards` → `board_columns` (ordered by `position`) → `cards`
+  (`tags text[]`, `description` = serialized Lexical JSON, float `position`)
+  + `card_attachments` (card ↔ file). Everything is shared between all
+  logged-in users — no per-board permissions.
+- API: `rpc.board.*` in `src/server/orpc/boards.ts` — list/create/get,
+  addColumn, createCard/updateCard/moveCard/deleteCard,
+  add/removeAttachment. `board.get` returns the fully nested board;
+  the UI invalidates that one query after any mutation.
+- Ordering uses float positions; new/moved cards append at
+  `max(position)+1` in the target column. Card moves use native HTML5
+  drag & drop (`routes/home/boards/$boardId.tsx`); card editing happens in
+  `~/components/boards/CardDialog` (title, lexical description, tags via
+  `<TagBadge>` hash-colored chips, attachments via the upload helpers).
 
 ### Misc
 
