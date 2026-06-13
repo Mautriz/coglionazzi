@@ -54,7 +54,7 @@ export function SupportSettings({
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const snippet = widget?.widgetKey
-    ? `<script src="${origin}/widget.js" data-widget-key="${widget.widgetKey}"></script>`
+    ? `<script src="${origin}/widget.js" data-widget-key="${widget.widgetKey}" data-position="left"></script>`
     : null;
 
   return (

@@ -2,9 +2,13 @@
   "use strict";
   // Embeddable support widget loader. Drop on any site with:
   //   <script src="https://YOURHOST/widget.js" data-widget-key="KEY"></script>
+  // Optional: data-position="left" | "right" (default right).
+  //
   // It injects a floating bubble + a hidden <iframe> pointing at the host's
-  // /widget page. All chat logic lives in the iframe (same-origin with the
-  // API); this script only manages the bubble + open/close.
+  // /widget page. The iframe is display:none until the bubble is clicked, so it
+  // never covers the host page — only the 56px bubble shows at rest. All chat
+  // logic lives in the iframe (same-origin with the API); this script only
+  // manages the bubble + open/close.
   var script = document.currentScript;
   if (!script) return;
   var key = script.getAttribute("data-widget-key");
@@ -13,6 +17,8 @@
     return;
   }
   var origin = new URL(script.src).origin;
+  // Which corner to dock in. "left" or "right" (default).
+  var side = script.getAttribute("data-position") === "left" ? "left" : "right";
   var Z = 2147483000;
 
   function el(tag, style) {
@@ -25,7 +31,6 @@
   var frame = el("iframe", {
     position: "fixed",
     bottom: "90px",
-    right: "20px",
     width: "380px",
     height: "600px",
     maxHeight: "calc(100vh - 120px)",
@@ -37,6 +42,7 @@
     display: "none",
     background: "transparent",
   });
+  frame.style[side] = "20px";
   frame.src = origin + "/widget?key=" + encodeURIComponent(key);
   frame.setAttribute("title", "Support chat");
 
@@ -44,7 +50,6 @@
   var btn = el("button", {
     position: "fixed",
     bottom: "20px",
-    right: "20px",
     width: "56px",
     height: "56px",
     borderRadius: "50%",
@@ -59,6 +64,7 @@
     justifyContent: "center",
     padding: "0",
   });
+  btn.style[side] = "20px";
   btn.setAttribute("aria-label", "Open support chat");
 
   var openIcon =
