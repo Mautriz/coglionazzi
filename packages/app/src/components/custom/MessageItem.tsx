@@ -31,7 +31,14 @@ export function MessageItem({
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="group rounded-md border border-card-border bg-card-background p-2">
+    <div
+      className={cn(
+        "group rounded-md border p-2",
+        isMine
+          ? "border-primary/30 bg-primary/5"
+          : "border-card-border bg-card-background",
+      )}
+    >
       <div className="mb-1 flex items-center gap-2">
         <UserAvatar
           id={message.createdBy ?? "ghost"}

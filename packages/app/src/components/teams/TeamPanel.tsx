@@ -8,7 +8,6 @@ import {
 } from "@tanstack/react-router";
 import {
   ArchiveIcon,
-  Gamepad2Icon,
   KanbanIcon,
   MessagesSquareIcon,
   PlusIcon,
@@ -159,13 +158,6 @@ export function TeamPanel({ teamId }: { teamId: string }) {
           icon={<ArchiveIcon className="size-4 shrink-0" />}
           label="Archive"
         />
-        <span className="flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground2">
-          <Gamepad2Icon className="size-4 shrink-0" />
-          Games
-          <span className="ml-auto text-[10px] uppercase tracking-wide">
-            soon
-          </span>
-        </span>
       </div>
 
       {filtersActive && (

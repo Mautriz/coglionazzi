@@ -9,6 +9,7 @@ import { archiveRouter } from "./archive";
 import { authP, resolveSession, t } from "./base";
 import { boardRouter } from "./boards";
 import { chatRouter } from "./chat";
+import { gameRouter } from "./game";
 import { presenceRouter } from "./presence";
 import { searchRouter } from "./search";
 import { teamRouter } from "./teams";
@@ -41,28 +42,26 @@ export const appRouter = {
         }),
       )
       .handler(async (info) => {
-        const filePath = await fileService.addFile(info.input.file);
+        // addFile optimizes raster images (downscale + WebP), so the stored
+        // metadata can differ from the upload (type/size/name).
+        const { fileId, metadata } = await fileService.addFile(info.input.file);
 
         const { id } = await db
           .insertInto("files")
           .values({
-            path: filePath,
+            path: fileId,
             user_id: info.context.user.id,
-            metadata: JSON.stringify({
-              name: info.input.file.name,
-              type: info.input.file.type,
-              size: info.input.file.size,
-            }),
+            metadata: JSON.stringify(metadata),
           })
           .returning("id")
           .executeTakeFirstOrThrow();
 
         return {
           id,
-          path: filePath,
-          name: info.input.file.name,
-          type: info.input.file.type,
-          url: fileUrl(filePath),
+          path: fileId,
+          name: metadata.name,
+          type: metadata.type,
+          url: fileUrl(fileId),
         };
       }),
 
@@ -86,6 +85,7 @@ export const appRouter = {
   board: boardRouter,
   archive: archiveRouter,
   chat: chatRouter,
+  game: gameRouter,
   presence: presenceRouter,
   search: searchRouter,
   team: teamRouter,

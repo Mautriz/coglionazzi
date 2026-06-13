@@ -17,13 +17,19 @@ import { Route as HomeDemoRouteImport } from './routes/home/demo'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as HomeTeamsRouteRouteImport } from './routes/home/teams/route'
+import { Route as HomeTeamsIndexRouteImport } from './routes/home/teams/index'
+import { Route as HomeGamesIndexRouteImport } from './routes/home/games/index'
+import { Route as HomeGamesSessionIdRouteImport } from './routes/home/games/$sessionId'
 import { Route as ApiRpcSplatRouteImport } from './routes/api/rpc/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as HomeTeamsTeamIdRouteRouteImport } from './routes/home/teams/$teamId/route'
 import { Route as HomeTeamsTeamIdIndexRouteImport } from './routes/home/teams/$teamId/index'
 import { Route as HomeTeamsTeamIdChatRouteImport } from './routes/home/teams/$teamId/chat'
 import { Route as HomeTeamsTeamIdArchiveRouteImport } from './routes/home/teams/$teamId/archive'
+import { Route as HomeGamesDecksDeckIdIndexRouteImport } from './routes/home/games/decks/$deckId/index'
 import { Route as HomeTeamsTeamIdBoardBoardIdRouteImport } from './routes/home/teams/$teamId/board.$boardId'
+import { Route as HomeGamesDecksDeckIdStatsRouteImport } from './routes/home/games/decks/$deckId/stats'
 
 const HomeRouteRoute = HomeRouteRouteImport.update({
   id: '/home',
@@ -65,6 +71,26 @@ const ApiFilesRoute = ApiFilesRouteImport.update({
   path: '/api/files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HomeTeamsRouteRoute = HomeTeamsRouteRouteImport.update({
+  id: '/teams',
+  path: '/teams',
+  getParentRoute: () => HomeRouteRoute,
+} as any)
+const HomeTeamsIndexRoute = HomeTeamsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => HomeTeamsRouteRoute,
+} as any)
+const HomeGamesIndexRoute = HomeGamesIndexRouteImport.update({
+  id: '/games/',
+  path: '/games/',
+  getParentRoute: () => HomeRouteRoute,
+} as any)
+const HomeGamesSessionIdRoute = HomeGamesSessionIdRouteImport.update({
+  id: '/games/$sessionId',
+  path: '/games/$sessionId',
+  getParentRoute: () => HomeRouteRoute,
+} as any)
 const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
   id: '/api/rpc/$',
   path: '/api/rpc/$',
@@ -76,9 +102,9 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const HomeTeamsTeamIdRouteRoute = HomeTeamsTeamIdRouteRouteImport.update({
-  id: '/teams/$teamId',
-  path: '/teams/$teamId',
-  getParentRoute: () => HomeRouteRoute,
+  id: '/$teamId',
+  path: '/$teamId',
+  getParentRoute: () => HomeTeamsRouteRoute,
 } as any)
 const HomeTeamsTeamIdIndexRoute = HomeTeamsTeamIdIndexRouteImport.update({
   id: '/',
@@ -95,17 +121,30 @@ const HomeTeamsTeamIdArchiveRoute = HomeTeamsTeamIdArchiveRouteImport.update({
   path: '/archive',
   getParentRoute: () => HomeTeamsTeamIdRouteRoute,
 } as any)
+const HomeGamesDecksDeckIdIndexRoute =
+  HomeGamesDecksDeckIdIndexRouteImport.update({
+    id: '/games/decks/$deckId/',
+    path: '/games/decks/$deckId/',
+    getParentRoute: () => HomeRouteRoute,
+  } as any)
 const HomeTeamsTeamIdBoardBoardIdRoute =
   HomeTeamsTeamIdBoardBoardIdRouteImport.update({
     id: '/board/$boardId',
     path: '/board/$boardId',
     getParentRoute: () => HomeTeamsTeamIdRouteRoute,
   } as any)
+const HomeGamesDecksDeckIdStatsRoute =
+  HomeGamesDecksDeckIdStatsRouteImport.update({
+    id: '/games/decks/$deckId/stats',
+    path: '/games/decks/$deckId/stats',
+    getParentRoute: () => HomeRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
   '/home': typeof HomeRouteRouteWithChildren
+  '/home/teams': typeof HomeTeamsRouteRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
@@ -114,10 +153,15 @@ export interface FileRoutesByFullPath {
   '/home/teams/$teamId': typeof HomeTeamsTeamIdRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/home/games/$sessionId': typeof HomeGamesSessionIdRoute
+  '/home/games/': typeof HomeGamesIndexRoute
+  '/home/teams/': typeof HomeTeamsIndexRoute
   '/home/teams/$teamId/archive': typeof HomeTeamsTeamIdArchiveRoute
   '/home/teams/$teamId/chat': typeof HomeTeamsTeamIdChatRoute
   '/home/teams/$teamId/': typeof HomeTeamsTeamIdIndexRoute
+  '/home/games/decks/$deckId/stats': typeof HomeGamesDecksDeckIdStatsRoute
   '/home/teams/$teamId/board/$boardId': typeof HomeTeamsTeamIdBoardBoardIdRoute
+  '/home/games/decks/$deckId/': typeof HomeGamesDecksDeckIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -129,16 +173,22 @@ export interface FileRoutesByTo {
   '/home': typeof HomeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/home/games/$sessionId': typeof HomeGamesSessionIdRoute
+  '/home/games': typeof HomeGamesIndexRoute
+  '/home/teams': typeof HomeTeamsIndexRoute
   '/home/teams/$teamId/archive': typeof HomeTeamsTeamIdArchiveRoute
   '/home/teams/$teamId/chat': typeof HomeTeamsTeamIdChatRoute
   '/home/teams/$teamId': typeof HomeTeamsTeamIdIndexRoute
+  '/home/games/decks/$deckId/stats': typeof HomeGamesDecksDeckIdStatsRoute
   '/home/teams/$teamId/board/$boardId': typeof HomeTeamsTeamIdBoardBoardIdRoute
+  '/home/games/decks/$deckId': typeof HomeGamesDecksDeckIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
   '/home': typeof HomeRouteRouteWithChildren
+  '/home/teams': typeof HomeTeamsRouteRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
@@ -147,10 +197,15 @@ export interface FileRoutesById {
   '/home/teams/$teamId': typeof HomeTeamsTeamIdRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
+  '/home/games/$sessionId': typeof HomeGamesSessionIdRoute
+  '/home/games/': typeof HomeGamesIndexRoute
+  '/home/teams/': typeof HomeTeamsIndexRoute
   '/home/teams/$teamId/archive': typeof HomeTeamsTeamIdArchiveRoute
   '/home/teams/$teamId/chat': typeof HomeTeamsTeamIdChatRoute
   '/home/teams/$teamId/': typeof HomeTeamsTeamIdIndexRoute
+  '/home/games/decks/$deckId/stats': typeof HomeGamesDecksDeckIdStatsRoute
   '/home/teams/$teamId/board/$boardId': typeof HomeTeamsTeamIdBoardBoardIdRoute
+  '/home/games/decks/$deckId/': typeof HomeGamesDecksDeckIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -158,6 +213,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/home'
+    | '/home/teams'
     | '/api/files'
     | '/auth/login'
     | '/auth/sign-up'
@@ -166,10 +222,15 @@ export interface FileRouteTypes {
     | '/home/teams/$teamId'
     | '/api/auth/$'
     | '/api/rpc/$'
+    | '/home/games/$sessionId'
+    | '/home/games/'
+    | '/home/teams/'
     | '/home/teams/$teamId/archive'
     | '/home/teams/$teamId/chat'
     | '/home/teams/$teamId/'
+    | '/home/games/decks/$deckId/stats'
     | '/home/teams/$teamId/board/$boardId'
+    | '/home/games/decks/$deckId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -181,15 +242,21 @@ export interface FileRouteTypes {
     | '/home'
     | '/api/auth/$'
     | '/api/rpc/$'
+    | '/home/games/$sessionId'
+    | '/home/games'
+    | '/home/teams'
     | '/home/teams/$teamId/archive'
     | '/home/teams/$teamId/chat'
     | '/home/teams/$teamId'
+    | '/home/games/decks/$deckId/stats'
     | '/home/teams/$teamId/board/$boardId'
+    | '/home/games/decks/$deckId'
   id:
     | '__root__'
     | '/'
     | '/auth'
     | '/home'
+    | '/home/teams'
     | '/api/files'
     | '/auth/login'
     | '/auth/sign-up'
@@ -198,10 +265,15 @@ export interface FileRouteTypes {
     | '/home/teams/$teamId'
     | '/api/auth/$'
     | '/api/rpc/$'
+    | '/home/games/$sessionId'
+    | '/home/games/'
+    | '/home/teams/'
     | '/home/teams/$teamId/archive'
     | '/home/teams/$teamId/chat'
     | '/home/teams/$teamId/'
+    | '/home/games/decks/$deckId/stats'
     | '/home/teams/$teamId/board/$boardId'
+    | '/home/games/decks/$deckId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -271,6 +343,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/home/teams': {
+      id: '/home/teams'
+      path: '/teams'
+      fullPath: '/home/teams'
+      preLoaderRoute: typeof HomeTeamsRouteRouteImport
+      parentRoute: typeof HomeRouteRoute
+    }
+    '/home/teams/': {
+      id: '/home/teams/'
+      path: '/'
+      fullPath: '/home/teams/'
+      preLoaderRoute: typeof HomeTeamsIndexRouteImport
+      parentRoute: typeof HomeTeamsRouteRoute
+    }
+    '/home/games/': {
+      id: '/home/games/'
+      path: '/games'
+      fullPath: '/home/games/'
+      preLoaderRoute: typeof HomeGamesIndexRouteImport
+      parentRoute: typeof HomeRouteRoute
+    }
+    '/home/games/$sessionId': {
+      id: '/home/games/$sessionId'
+      path: '/games/$sessionId'
+      fullPath: '/home/games/$sessionId'
+      preLoaderRoute: typeof HomeGamesSessionIdRouteImport
+      parentRoute: typeof HomeRouteRoute
+    }
     '/api/rpc/$': {
       id: '/api/rpc/$'
       path: '/api/rpc/$'
@@ -287,10 +387,10 @@ declare module '@tanstack/react-router' {
     }
     '/home/teams/$teamId': {
       id: '/home/teams/$teamId'
-      path: '/teams/$teamId'
+      path: '/$teamId'
       fullPath: '/home/teams/$teamId'
       preLoaderRoute: typeof HomeTeamsTeamIdRouteRouteImport
-      parentRoute: typeof HomeRouteRoute
+      parentRoute: typeof HomeTeamsRouteRoute
     }
     '/home/teams/$teamId/': {
       id: '/home/teams/$teamId/'
@@ -313,12 +413,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HomeTeamsTeamIdArchiveRouteImport
       parentRoute: typeof HomeTeamsTeamIdRouteRoute
     }
+    '/home/games/decks/$deckId/': {
+      id: '/home/games/decks/$deckId/'
+      path: '/games/decks/$deckId'
+      fullPath: '/home/games/decks/$deckId/'
+      preLoaderRoute: typeof HomeGamesDecksDeckIdIndexRouteImport
+      parentRoute: typeof HomeRouteRoute
+    }
     '/home/teams/$teamId/board/$boardId': {
       id: '/home/teams/$teamId/board/$boardId'
       path: '/board/$boardId'
       fullPath: '/home/teams/$teamId/board/$boardId'
       preLoaderRoute: typeof HomeTeamsTeamIdBoardBoardIdRouteImport
       parentRoute: typeof HomeTeamsTeamIdRouteRoute
+    }
+    '/home/games/decks/$deckId/stats': {
+      id: '/home/games/decks/$deckId/stats'
+      path: '/games/decks/$deckId/stats'
+      fullPath: '/home/games/decks/$deckId/stats'
+      preLoaderRoute: typeof HomeGamesDecksDeckIdStatsRouteImport
+      parentRoute: typeof HomeRouteRoute
     }
   }
 }
@@ -354,16 +468,38 @@ const HomeTeamsTeamIdRouteRouteChildren: HomeTeamsTeamIdRouteRouteChildren = {
 const HomeTeamsTeamIdRouteRouteWithChildren =
   HomeTeamsTeamIdRouteRoute._addFileChildren(HomeTeamsTeamIdRouteRouteChildren)
 
+interface HomeTeamsRouteRouteChildren {
+  HomeTeamsTeamIdRouteRoute: typeof HomeTeamsTeamIdRouteRouteWithChildren
+  HomeTeamsIndexRoute: typeof HomeTeamsIndexRoute
+}
+
+const HomeTeamsRouteRouteChildren: HomeTeamsRouteRouteChildren = {
+  HomeTeamsTeamIdRouteRoute: HomeTeamsTeamIdRouteRouteWithChildren,
+  HomeTeamsIndexRoute: HomeTeamsIndexRoute,
+}
+
+const HomeTeamsRouteRouteWithChildren = HomeTeamsRouteRoute._addFileChildren(
+  HomeTeamsRouteRouteChildren,
+)
+
 interface HomeRouteRouteChildren {
+  HomeTeamsRouteRoute: typeof HomeTeamsRouteRouteWithChildren
   HomeDemoRoute: typeof HomeDemoRoute
   HomeIndexRoute: typeof HomeIndexRoute
-  HomeTeamsTeamIdRouteRoute: typeof HomeTeamsTeamIdRouteRouteWithChildren
+  HomeGamesSessionIdRoute: typeof HomeGamesSessionIdRoute
+  HomeGamesIndexRoute: typeof HomeGamesIndexRoute
+  HomeGamesDecksDeckIdStatsRoute: typeof HomeGamesDecksDeckIdStatsRoute
+  HomeGamesDecksDeckIdIndexRoute: typeof HomeGamesDecksDeckIdIndexRoute
 }
 
 const HomeRouteRouteChildren: HomeRouteRouteChildren = {
+  HomeTeamsRouteRoute: HomeTeamsRouteRouteWithChildren,
   HomeDemoRoute: HomeDemoRoute,
   HomeIndexRoute: HomeIndexRoute,
-  HomeTeamsTeamIdRouteRoute: HomeTeamsTeamIdRouteRouteWithChildren,
+  HomeGamesSessionIdRoute: HomeGamesSessionIdRoute,
+  HomeGamesIndexRoute: HomeGamesIndexRoute,
+  HomeGamesDecksDeckIdStatsRoute: HomeGamesDecksDeckIdStatsRoute,
+  HomeGamesDecksDeckIdIndexRoute: HomeGamesDecksDeckIdIndexRoute,
 }
 
 const HomeRouteRouteWithChildren = HomeRouteRoute._addFileChildren(

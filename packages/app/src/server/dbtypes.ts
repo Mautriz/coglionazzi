@@ -121,6 +121,44 @@ export interface Files {
   user_id: string;
 }
 
+export interface GameDeckCards {
+  deck_id: string;
+  description: string | null;
+  file_id: string;
+  id: Generated<string>;
+  position: number;
+  title: string;
+}
+
+export interface GameDecks {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  description: string | null;
+  id: Generated<string>;
+  name: string;
+}
+
+export interface GameSessionPlayers {
+  joined_at: Generated<Timestamp>;
+  session_id: string;
+  user_id: string;
+}
+
+export interface GameSessions {
+  card_count: number | null;
+  created_at: Generated<Timestamp>;
+  deck_id: string;
+  finished_at: Timestamp | null;
+  host_id: string | null;
+  id: Generated<string>;
+  kind: Generated<string>;
+  started_at: Timestamp | null;
+  status: Generated<string>;
+  team_id: string | null;
+  visibility: Generated<string>;
+  winner_card_id: string | null;
+}
+
 export interface Sessions {
   created_at: Timestamp;
   expires_at: Timestamp;
@@ -165,6 +203,27 @@ export interface Verifications {
   value: string;
 }
 
+export interface VersusMatchups {
+  id: Generated<string>;
+  left_card_id: string;
+  left_votes: Generated<number>;
+  position: number;
+  resolved_at: Timestamp | null;
+  right_card_id: string;
+  right_votes: Generated<number>;
+  round: number;
+  session_id: string;
+  status: Generated<string>;
+  winner_card_id: string | null;
+}
+
+export interface VersusVotes {
+  choice: string;
+  created_at: Generated<Timestamp>;
+  matchup_id: string;
+  user_id: string;
+}
+
 export interface DB {
   accounts: Accounts;
   board_columns: BoardColumns;
@@ -177,9 +236,15 @@ export interface DB {
   chat_messages: ChatMessages;
   chat_rooms: ChatRooms;
   files: Files;
+  game_deck_cards: GameDeckCards;
+  game_decks: GameDecks;
+  game_session_players: GameSessionPlayers;
+  game_sessions: GameSessions;
   sessions: Sessions;
   team_members: TeamMembers;
   teams: Teams;
   users: Users;
   verifications: Verifications;
+  versus_matchups: VersusMatchups;
+  versus_votes: VersusVotes;
 }

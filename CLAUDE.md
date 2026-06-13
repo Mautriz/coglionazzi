@@ -63,12 +63,14 @@ packages/
         │   ├── __root.tsx         # head, theme init script, session beforeLoad
         │   ├── index.tsx          # redirects to /home or /auth/login
         │   ├── auth/              # public: route.tsx layout + login + sign-up
-        │   ├── home/              # protected: route.tsx = guard + topbar + TeamRail
-        │   │   ├── index.tsx      # landing: teams grid + global chat
+        │   ├── home/              # protected: route.tsx = guard + topbar (sections nav)
+        │   │   ├── index.tsx      # Home = global chat only
         │   │   ├── demo.tsx       # playground: editor + file uploads
-        │   │   └── teams/$teamId/ # a team's workspace (route.tsx = TeamPanel):
-        │   │       │              #   index → first board, board.$boardId,
-        │   │       │              #   chat, archive
+        │   │   ├── games/         # global Versus game: index (lobbies+decks),
+        │   │   │                  #   decks/$deckId/{index editor, stats}, $sessionId play
+        │   │   └── teams/         # Teams section: route.tsx = TeamRail (rail lives
+        │   │       │              #   ONLY here), index → first team, $teamId/
+        │   │       │              #   (route.tsx = TeamPanel) → board/chat/archive
         │   └── api/
         │       ├── auth/$.ts      # better-auth handler (GET/POST)
         │       ├── files.ts       # GET ?fileId= → streams an uploaded file
@@ -79,14 +81,18 @@ packages/
         │   ├── auth.ts            # betterAuth() config + snake_case field maps
         │   ├── ws/
         │   │   └── rpcHandler.ts  # crossws WS handler: upgrade auth + 5-min re-check
+        │   ├── files.ts           # disk storage; optimizes images on upload (sharp)
         │   ├── realtime/
         │   │   ├── publisher.ts   # shared EventPublisher + chatPublisher (room-keyed)
-        │   │   └── presence.ts    # in-memory per-board viewer registry
+        │   │   ├── presence.ts    # in-memory per-board viewer registry
+        │   │   ├── gamePublisher.ts # session-keyed game events + lobby presence
+        │   │   └── versusEngine.ts  # in-memory Versus bracket state machine + timer
         │   └── orpc/
         │       ├── base.ts        # ORPCContext (+ connection), `t`, `authP`, resolveSession
         │       ├── roomAccess.ts  # chat room ref/resolve/access (per-kind)
         │       ├── chat.ts        # chat.* (rooms + messages + reactions + subscribe)
         │       ├── presence.ts    # presence.subscribe Event Iterator
+        │       ├── game/          # decks + sessions (lobby) + versus module + access
         │       ├── router.ts      # appRouter — add feature routers here
         │       └── client.ts      # createAppClient → typed client + query utils
         ├── lib/
@@ -94,12 +100,14 @@ packages/
         │   ├── wsClient.ts        # partysocket ReconnectingWebSocket singleton (browser)
         │   ├── useRealtime.ts     # useBoardRealtime/useBoardPresence/useWorkspaceRealtime
         │   ├── useChatRoom.ts     # open + live-stream a chat room (messages/reactions)
+        │   ├── useGameSession.ts  # seed + live-stream a game session (presence/votes/state)
         │   ├── authClient.tsx     # better-auth react client
         │   ├── theme.ts           # light/dark via class on <html>, localStorage
         │   └── classUtils.tsx     # cn()
         ├── components/
         │   ├── ui/                # shadcn components (add via shadcn CLI)
         │   ├── teams/             # TeamRail (global bubble rail) + TeamPanel
+        │   ├── games/             # NewGameDialog (create a Versus session)
         │   └── custom/            # AppForm, Logo, TeamAvatar, app-specific
         └── styles/app.css         # the ONLY Tailwind/theme config (v4 CSS-first)
 ```
@@ -239,6 +247,12 @@ Postgres + a `uploads` volume for assets.
 - Files live on disk at `IMAGES_PATH` (default `packages/app/data/images`,
   gitignored) and are served by `GET /api/files?fileId=…` with long cache.
   The `files` table records path + metadata (`{name,type,size}`) + uploader.
+- Raster images are optimized on upload in `fileService.addFile` (`server/files.ts`,
+  via `sharp`): auto-orient, downscale to ≤1920px longest edge, strip metadata,
+  recompress to WebP q80 — so we never store/serve 8K originals. SVG and GIF are
+  left untouched; `addFile` returns the metadata of what was ACTUALLY stored
+  (type/size/name change for optimized images). Note: the ≤20MB cap is on the
+  UPLOAD; optimization shrinks what's stored, not the bytes uploaded.
 
 ### Teams (permissions)
 
@@ -315,12 +329,13 @@ Postgres + a `uploads` volume for assets.
   via the upload helpers, a `<MessageThread>` card discussion at the bottom —
   see Chat rooms & messages). Archiving a card KEEPS its room/messages; only
   `archive.purge` deletes them (`deleteCardRooms`).
-- Navigation chrome: the global topbar (Logo → Home, Demo link, `UserActions`
-  = theme + logout) sits above everything; the `<TeamRail>` (team bubbles) is
-  in the `/home` shell; the `<TeamPanel>` (its second column) is added by
-  `routes/home/teams/$teamId/route.tsx`. The panel holds the global
-  `<SearchBox>` (deliberately NOT in the shared topbar), the team's boards +
-  spaces, and — when a board OR the archive is open — that view's filters.
+- Navigation chrome: the global topbar carries the app **sections** (Home /
+  Teams / Games / Demo) + `UserActions` (theme + logout). **Home** is the global
+  chat only. The `<TeamRail>` (team bubbles) lives ONLY in the Teams section
+  (`routes/home/teams/route.tsx`); the `<TeamPanel>` (second column) is added by
+  `routes/home/teams/$teamId/route.tsx` and holds the global `<SearchBox>`
+  (deliberately NOT in the topbar), the team's boards + spaces, and — when a
+  board OR the archive is open — that view's filters.
 - Filtering is client-side over the already-loaded board/archive: pure
   functions in `~/lib/cardFilters.ts` (`cardMatchesFilters`, `isFilterActive`,
   `mergeFilters` = merge a patch + drop emptied keys) over the active route's
@@ -423,6 +438,60 @@ Postgres + a `uploads` volume for assets.
   `teamId` and deep-link to the team-scoped board route, card/message hits via
   its `?card=` param.
 
+### Games (Versus + the game framework)
+
+- A small **game framework** (global, NOT team-scoped) under
+  `src/server/orpc/game/` + `routes/home/games/`, designed for many games. Layers:
+  a shared **deck** (reusable image set), a shared **session** (lobby lifecycle),
+  and a per-game **module** (only `versus` today; future `rating`/`tierlist` add
+  their own tables + module against the SAME deck/session/presence shell).
+  `game_sessions.kind` discriminates the mechanic. Spec:
+  `docs/superpowers/specs/2026-06-13-versus-game-design.md`.
+- **Decks** (`game_decks` + `game_deck_cards` → `files`): `rpc.game.decks.*`
+  (list/get/create/update/addCard/updateCard/removeCard/delete + **clone** +
+  **stats**). Global content; **creator-only edit** (`assertDeckOwner`) — anyone
+  else can `clone` a deck into their own editable copy. Edited in place
+  (auto-save) in the deck editor; images use the upload helpers (optimized on
+  upload — see File uploads). `stats({deckId})` aggregates per-card appearances /
+  votes / wins / championships / win-rate across the deck's completed games
+  (`/home/games/decks/$deckId/stats`).
+- **Sessions** (`game_sessions` + frozen `game_session_players` roster):
+  `rpc.game.sessions.*` — create({deckId,visibility,teamId?}), list (public
+  lobbies only — private games are unlisted), get (full snapshot), subscribe.
+  Access via `assertSessionAccess`: **public** → any logged-in user; **private**
+  → unlisted / join-by-link (any logged-in user with the link), UNLESS an
+  OPTIONAL `team_id` is set, in which case `assertTeamMember` (link works for that
+  team only). No FK on `team_id` (mirrors chat rooms).
+- **Versus** = single-elimination left/right bracket (`versus_matchups` +
+  `versus_votes`). Host `start({sessionId,cardCount})` (power-of-2 ≤ deck size):
+  freezes the present players as the roster, draws a RANDOM subset, seeds round 1,
+  opens matchup #1. Players `vote({matchupId,choice})` (roster-only, current
+  matchup, before the deadline; changeable). The bracket grows round-by-round
+  (`left/right_card_id` are NOT NULL, so a round's matchups are created from the
+  previous round's winners). Tie (incl. 0–0) → random.
+- **The engine** (`server/realtime/versusEngine.ts`) is an in-memory state
+  machine per active session (current matchup, live tallies, frozen roster size,
+  a server-authoritative **timer**). A matchup opens at +60s; once **≥50% of the
+  roster** has voted the deadline collapses to `min(open+60s, now+10s)`, and once
+  **everyone** has voted it resolves instantly. On resolve a `resolved` event
+  reveals the winner (clients zoom it) for ~2.5s before the next matchup opens
+  (a following `state`). Votes are ALSO persisted (so `sessions.get` recomputes
+  counts); the engine owns the DEADLINE (memory only). **Single instance** — a
+  restart mid-game loses the live timer (cast votes survive), same constraint as
+  presence. Timings (full / short / reveal) are `__setVersusTimings`-overridable
+  for tests only.
+- **Realtime** uses a session-keyed `gamePublisher` (like `chatPublisher`) +
+  in-memory lobby presence (`gamePublisher.ts`). `sessions.subscribe` registers
+  presence and streams `GameEvent`s; the client (`lib/useGameSession.ts`) seeds
+  from `sessions.get` and applies them: high-frequency `votes` stream as deltas
+  (live counts + deadline), low-frequency `state` (matchup opened/resolved/
+  finished) is signal-and-refetch, `presence` is the live roster.
+- UI: `/home/games` (topbar **Games** link) lists open lobbies + decks;
+  `decks/$deckId` is the editor (+ Play → `<NewGameDialog>`); `$sessionId` is the
+  play view (lobby → live matchup voting → champion + results). New game = new
+  `*_` tables + a realtime engine + a `game.<kind>.*` module; reuse decks/sessions/
+  presence.
+
 ### Realtime (WebSockets)
 
 - **Transport:** in the browser EVERY oRPC call goes over ONE persistent
@@ -474,7 +543,8 @@ Postgres + a `uploads` volume for assets.
   (`useChatRoom`) applies it to the local list — **stream, not refetch**
   (reaction deltas carry the actor so each client recomputes `reactedByMe`).
   `useChatRoom` resubscribes + refetches the latest page on reconnect to fill
-  gaps. Use a room-keyed publisher for any future high-frequency fan-out.
+  gaps. Use a room-keyed publisher for any future high-frequency fan-out — the
+  Versus game's `gamePublisher` (session-keyed) is the other one (see Games).
 - **`team` channel = workspace/sidebar liveness** (board added/removed, member
   added/removed, rename, delete). `publishTeamChanged(teamId, affectedUserIds?)`:
   `affectedUserIds` lists members whose OWN membership changed, so a
