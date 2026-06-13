@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { LifeBuoyIcon, MailIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CopyIcon,
+  ExternalLinkIcon,
+  LifeBuoyIcon,
+  MailIcon,
+} from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 import { MessageThread } from "~/components/custom/MessageThread";
 import { Button } from "~/components/ui/button";
@@ -52,10 +60,13 @@ function RouteComponent() {
 
   return (
     <main className="flex w-full flex-1 flex-col px-4 py-6 sm:px-6 lg:px-8">
-      <h1 className="mb-3 flex items-center gap-2 font-display text-2xl font-bold">
-        <LifeBuoyIcon className="size-6 text-primary" />
-        Support
-      </h1>
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <h1 className="flex items-center gap-2 font-display text-2xl font-bold">
+          <LifeBuoyIcon className="size-6 text-primary" />
+          Support
+        </h1>
+        <ClientSupportLink teamId={teamId} />
+      </div>
 
       <div className="flex min-h-0 flex-1 gap-4 max-md:flex-col">
         {/* Inbox */}
@@ -141,6 +152,77 @@ function RouteComponent() {
         </div>
       </div>
     </main>
+  );
+}
+
+/** The customer-facing link: open the live widget page, or copy it to share /
+ *  embed elsewhere. Owners can enable the widget inline if it isn't yet. */
+function ClientSupportLink({ teamId }: { teamId: string }) {
+  const { data: teams } = useQuery(rpc.team.list.queryOptions());
+  const isOwner = teams?.find((t) => t.id === teamId)?.isOwner ?? false;
+  const { data: widget, refetch } = useQuery(
+    rpc.support.widgetKey.queryOptions({ input: { teamId } }),
+  );
+  const { mutate: enable, isPending } = useMutation(
+    rpc.support.enableWidget.mutationOptions({
+      onSuccess: () => refetch(),
+      onError: (e) => toast.error(e.message),
+    }),
+  );
+  const [copied, setCopied] = useState(false);
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+
+  if (widget?.widgetKey) {
+    const url = `${origin}/widget?key=${widget.widgetKey}`;
+    return (
+      <div className="flex items-center gap-1.5">
+        <Button asChild size="sm" variant="outline">
+          <a href={url} target="_blank" rel="noreferrer">
+            <ExternalLinkIcon className="size-4" />
+            Open client chat
+          </a>
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            navigator.clipboard.writeText(url);
+            setCopied(true);
+            toast.success("Client link copied");
+            setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          {copied ? (
+            <CheckIcon className="size-4" />
+          ) : (
+            <CopyIcon className="size-4" />
+          )}
+          Copy link
+        </Button>
+      </div>
+    );
+  }
+
+  if (isOwner) {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={isPending}
+        onClick={() => enable({ teamId })}
+      >
+        {isPending ? "Enabling…" : "Enable client support"}
+      </Button>
+    );
+  }
+
+  return (
+    <span className="text-xs text-muted-foreground">
+      Client widget not enabled yet.
+    </span>
   );
 }
 
