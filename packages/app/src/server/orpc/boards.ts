@@ -228,8 +228,9 @@ export const boardRouter = {
     return boards.map((b) => ({ ...b, cardCount: Number(b.cardCount) }));
   }),
 
-  /** Every distinct tag used across the team's cards — feeds the tag combobox
-   *  (suggestions) on the card editor and the filters. */
+  /** Every distinct tag used across the team's LIVE cards (archived excluded,
+   *  like every other read path) — feeds the tag combobox (suggestions) on the
+   *  card editor and the filters. */
   teamTags: authP
     .input(z.object({ teamId: z.uuid() }))
     .handler(async (info) => {
@@ -237,7 +238,7 @@ export const boardRouter = {
       const result = await sql<{ tag: string }>`
         select distinct unnest(tags) as tag
         from cards
-        where team_id = ${info.input.teamId}
+        where team_id = ${info.input.teamId} and archived_at is null
         order by tag
       `.execute(db);
       return result.rows.map((r) => r.tag);
