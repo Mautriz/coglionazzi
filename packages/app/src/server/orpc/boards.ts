@@ -308,6 +308,75 @@ export const boardRouter = {
         .executeTakeFirstOrThrow();
     }),
 
+  renameColumn: authP
+    .input(
+      z.object({
+        columnId: z.uuid(),
+        name: z.string().trim().min(1).max(80),
+      }),
+    )
+    .handler(async (info) => {
+      await assertColumnAccess(info.context.user.id, info.input.columnId);
+      await db
+        .updateTable("board_columns")
+        .set({ name: info.input.name })
+        .where("id", "=", info.input.columnId)
+        .execute();
+    }),
+
+  /** Reorder a column. `position` (float, midpoint-of-neighbors computed
+   *  client-side) places it; omitted = append at end of its board. */
+  moveColumn: authP
+    .input(
+      z.object({
+        columnId: z.uuid(),
+        position: z.number().finite().optional(),
+      }),
+    )
+    .handler(async (info) => {
+      await assertColumnAccess(info.context.user.id, info.input.columnId);
+      let position = info.input.position;
+      if (position === undefined) {
+        const col = await db
+          .selectFrom("board_columns")
+          .where("id", "=", info.input.columnId)
+          .select("board_id")
+          .executeTakeFirstOrThrow();
+        const row = await db
+          .selectFrom("board_columns")
+          .where("board_id", "=", col.board_id)
+          .select((eb) => eb.fn.max("position").as("max"))
+          .executeTakeFirst();
+        position = (row?.max ?? 0) + 1;
+      }
+      await db
+        .updateTable("board_columns")
+        .set({ position })
+        .where("id", "=", info.input.columnId)
+        .execute();
+    }),
+
+  deleteColumn: authP
+    .input(z.object({ columnId: z.uuid() }))
+    .handler(async (info) => {
+      await assertColumnAccess(info.context.user.id, info.input.columnId);
+      // Clean up the polymorphic comments of this column's cards (no FK)
+      // before the cascade wipes the cards.
+      const cards = await db
+        .selectFrom("cards")
+        .where("column_id", "=", info.input.columnId)
+        .select("id")
+        .execute();
+      await deleteCommentsOf(
+        "card",
+        cards.map((c) => c.id),
+      );
+      await db
+        .deleteFrom("board_columns")
+        .where("id", "=", info.input.columnId)
+        .execute();
+    }),
+
   createCard: authP
     .input(
       z.object({

@@ -143,6 +143,10 @@ Run from repo root:
   formatted-text feature. It's uncontrolled: pass `onChange` to receive the
   serialized editor-state JSON (persist that string) and `initialState` to
   restore it. Demo on `/home`.
+- Keyboard submit: pass `onSubmit` to fire on ⌘/Ctrl+Enter; add
+  `submitOnEnter` so a bare Enter submits and Shift+Enter is a newline
+  (the comment composer uses this; the card description uses ⌘/Ctrl+Enter).
+  Implemented by `components/editor/SubmitPlugin.tsx`.
 - Feature set is local-only (history, headings/quote/code, lists +
   checklists, links + autolink, markdown shortcuts, alignment/indent, hr).
   New toolbar actions go in `components/editor/ToolbarPlugin.tsx`; new nodes
@@ -203,21 +207,27 @@ Run from repo root:
   per pair (addRelation clears the pair first). `board.get` resolves the
   per-card kind from each card's point of view.
 - API: `rpc.board.*` in `src/server/orpc/boards.ts` — list/create/get,
-  addColumn, createCard/updateCard/moveCard/deleteCard,
-  add/removeAttachment, add/removeRelation (all team-gated). `create` takes
-  a `teamId`; `updateCard` takes optional `assigneeIds` (replaces the whole
-  set, validated against the card's team membership). `rpc.team.members`
-  feeds the (team-scoped) assignee pickers. `board.get` returns the fully
-  nested board (cards carry `assignees`, `relations`, `commentCount`,
-  `attachments`); the UI invalidates that one query after any mutation.
+  addColumn/renameColumn/moveColumn/deleteColumn,
+  createCard/updateCard/moveCard/deleteCard, add/removeAttachment,
+  add/removeRelation (all team-gated). `create` takes a `teamId`;
+  `updateCard` takes optional `assigneeIds` (replaces the whole set,
+  validated against the card's team membership). `deleteColumn` cleans up
+  its cards' comments (no FK). `rpc.team.members` feeds the (team-scoped)
+  assignee pickers. `board.get` returns the fully nested board (cards carry
+  `assignees`, `relations`, `commentCount`, `attachments`); the UI
+  invalidates that one query after any mutation.
 - Ordering uses float positions: the client computes midpoint-of-neighbors
-  and sends it to `moveCard` (omitted position = append at end). Drag &
-  drop is @dnd-kit (`DndContext` + per-column `SortableContext` +
-  `useDroppable` columns + `DragOverlay`) in
-  `routes/home/boards/$boardId.tsx`, with an optimistic
-  `queryClient.setQueryData` so cards don't snap back; `onSettled`
-  re-syncs. The PointerSensor uses `activationConstraint.distance` so
-  plain clicks still open the card dialog.
+  and sends it to `moveCard`/`moveColumn` (omitted position = append at
+  end). Drag & drop is @dnd-kit in `routes/home/boards/$boardId.tsx`: a
+  horizontal `SortableContext` of columns wraps per-column vertical
+  `SortableContext`s of cards (one `DndContext`). Items carry
+  `data.type: 'column' | 'card'`; `handleDragEnd` branches on it. Each
+  column is `useSortable` (drag listeners only on the grip handle) which
+  also makes it the droppable for cards (incl. empty columns). Optimistic
+  `queryClient.setQueryData` (cards and columns) avoids snap-back;
+  `onSettled` re-syncs. PointerSensor `activationConstraint.distance` keeps
+  plain clicks opening the dialog. Column headers rename inline (click →
+  input, Enter/blur saves) and have a hover delete.
 - Card editing happens in `~/components/boards/CardDialog` (title, lexical
   description, assignees via `<AssigneeCombobox>`, related-cards manager
   with a kind select, tags via `<TagBadge>` hash-colored chips, attachments

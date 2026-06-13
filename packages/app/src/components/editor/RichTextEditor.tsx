@@ -20,6 +20,7 @@ import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import type { EditorState, EditorThemeClasses } from "lexical";
 import { cn } from "~/lib/classUtils";
 import { CodeHighlightPlugin } from "./CodeHighlightPlugin";
+import { SubmitPlugin } from "./SubmitPlugin";
 import { ToolbarPlugin } from "./ToolbarPlugin";
 
 /** Maps Lexical's theme slots onto the classes in styles/editor.css. */
@@ -128,6 +129,8 @@ const AUTO_LINK_MATCHERS = [
 export function RichTextEditor({
   initialState,
   onChange,
+  onSubmit,
+  submitOnEnter = false,
   placeholder = "Write something…",
   className,
   namespace = "editor",
@@ -136,6 +139,11 @@ export function RichTextEditor({
   /** Serialized editor state JSON (from `onChange`). */
   initialState?: string;
   onChange?: (serializedState: string) => void;
+  /** Fires on Cmd/Ctrl+Enter (and bare Enter when `submitOnEnter`). */
+  onSubmit?: () => void;
+  /** Submit on a plain Enter (Shift+Enter = newline). For comment-style
+   *  composers; leave off for document-style fields. */
+  submitOnEnter?: boolean;
   placeholder?: string;
   className?: string;
   namespace?: string;
@@ -210,6 +218,9 @@ export function RichTextEditor({
       <CodeHighlightPlugin />
       {onChange && (
         <OnChangePlugin onChange={handleChange} ignoreSelectionChange />
+      )}
+      {onSubmit && (
+        <SubmitPlugin onSubmit={onSubmit} submitOnEnter={submitOnEnter} />
       )}
     </LexicalComposer>
   );

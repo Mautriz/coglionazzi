@@ -92,7 +92,9 @@ export function CommentsSection({
         <RichTextEditor
           key={editorKey}
           namespace={`comment-draft-${entityId}`}
-          placeholder="Write a comment…"
+          placeholder="Write a comment… (Enter to post, Shift+Enter for a new line)"
+          submitOnEnter
+          onSubmit={post}
           onChange={(json) => {
             draftRef.current = json;
             // Cheap "is there any text" check on the serialized state so the

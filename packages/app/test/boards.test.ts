@@ -22,6 +22,77 @@ async function makeBoardWithCard(context: Awaited<ReturnType<typeof signUpTestUs
   return { boardId, columnId, cardId, board };
 }
 
+describe("board columns", () => {
+  it("renames a column", async () => {
+    const { context } = await signUpTestUser();
+    const { boardId, board } = await makeBoardWithCard(context);
+    await call(
+      boardRouter.renameColumn,
+      { columnId: board.columns[0].id, name: "Backlog" },
+      { context },
+    );
+    const after = await call(boardRouter.get, { boardId }, { context });
+    expect(after.columns[0].name).toBe("Backlog");
+  });
+
+  it("reorders columns by explicit position", async () => {
+    const { context } = await signUpTestUser();
+    const { boardId, board } = await makeBoardWithCard(context);
+    // Move "Done" before "To do" (position below the first).
+    const done = board.columns[2];
+    await call(
+      boardRouter.moveColumn,
+      { columnId: done.id, position: board.columns[0].position - 1 },
+      { context },
+    );
+    const after = await call(boardRouter.get, { boardId }, { context });
+    expect(after.columns.map((c) => c.name)).toEqual([
+      "Done",
+      "To do",
+      "Doing",
+    ]);
+  });
+
+  it("deletes a column and its cards' comments", async () => {
+    const { context } = await signUpTestUser();
+    const { boardId, columnId, cardId } = await makeBoardWithCard(context);
+    await call(
+      commentRouter.add,
+      { entityType: "card", entityId: cardId, body: lexicalState("hi") },
+      { context },
+    );
+
+    await call(boardRouter.deleteColumn, { columnId }, { context });
+
+    const after = await call(boardRouter.get, { boardId }, { context });
+    expect(after.columns.map((c) => c.name)).toEqual(["Doing", "Done"]);
+    const orphans = Number(
+      (
+        await db
+          .selectFrom("comments")
+          .where("entity_type", "=", "card")
+          .where("entity_id", "=", cardId)
+          .select((eb) => eb.fn.countAll().as("c"))
+          .executeTakeFirstOrThrow()
+      ).c,
+    );
+    expect(orphans).toBe(0);
+  });
+
+  it("a non-member can't rename or delete a column", async () => {
+    const { context: alice } = await signUpTestUser("Alice");
+    const { context: bob } = await signUpTestUser("Bob");
+    const { board } = await makeBoardWithCard(alice);
+    const columnId = board.columns[0].id;
+    await expect(
+      call(boardRouter.renameColumn, { columnId, name: "x" }, { context: bob }),
+    ).rejects.toThrowError(ORPCError);
+    await expect(
+      call(boardRouter.deleteColumn, { columnId }, { context: bob }),
+    ).rejects.toThrowError(ORPCError);
+  });
+});
+
 describe("boards", () => {
   it("creates a board with the default columns", async () => {
     const { context } = await signUpTestUser();

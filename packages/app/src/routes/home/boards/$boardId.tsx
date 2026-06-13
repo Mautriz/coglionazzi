@@ -2,13 +2,13 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
-  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import {
+  horizontalListSortingStrategy,
   SortableContext,
   useSortable,
   verticalListSortingStrategy,
@@ -21,6 +21,7 @@ import {
 } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
+  GripVerticalIcon,
   LinkIcon,
   MessageSquareIcon,
   PaperclipIcon,
@@ -78,6 +79,10 @@ function RouteComponent() {
     rpc.board.moveCard.mutationOptions({ onSettled: invalidateBoard }),
   );
 
+  const { mutate: moveColumn } = useMutation(
+    rpc.board.moveColumn.mutationOptions({ onSettled: invalidateBoard }),
+  );
+
   const { mutate: deleteBoard, isPending: isDeletingBoard } = useMutation(
     rpc.board.deleteBoard.mutationOptions({
       onSuccess: () => {
@@ -89,6 +94,9 @@ function RouteComponent() {
 
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [activeCard, setActiveCard] = useState<BoardCard | null>(null);
+  const [activeColumn, setActiveColumn] = useState<
+    Board["columns"][number] | null
+  >(null);
 
   // Search results deep-link to a card via ?card=; consume the param into
   // local state (and drop it from the URL, keeping the filter params).
@@ -123,13 +131,27 @@ function RouteComponent() {
   const openCard = allCards.find((c) => c.id === openCardId) ?? null;
 
   function handleDragStart(e: DragStartEvent) {
-    setActiveCard(allCards.find((c) => c.id === e.active.id) ?? null);
+    if (e.active.data.current?.type === "column") {
+      setActiveColumn(
+        board.columns.find((c) => c.id === e.active.id) ?? null,
+      );
+    } else {
+      setActiveCard(allCards.find((c) => c.id === e.active.id) ?? null);
+    }
   }
 
   function handleDragEnd(e: DragEndEvent) {
+    const wasColumn = !!activeColumn;
     setActiveCard(null);
+    setActiveColumn(null);
     const { active, over } = e;
     if (!over) return;
+
+    if (wasColumn) {
+      handleColumnDrop(String(active.id), String(over.id));
+      return;
+    }
+
     const cardId = String(active.id);
 
     // Drop target: a column (empty space → append) or a card (take its slot).
@@ -190,6 +212,47 @@ function RouteComponent() {
     moveCard({ cardId, columnId: targetColId, position });
   }
 
+  function handleColumnDrop(columnId: string, overId: string) {
+    if (columnId === overId) return;
+    // `over` is another column, or a card inside one — resolve to a column.
+    let overCol = board.columns.find((c) => c.id === overId);
+    if (!overCol) {
+      overCol = board.columns.find((c) =>
+        c.cards.some((k) => k.id === overId),
+      );
+    }
+    if (!overCol || overCol.id === columnId) return;
+
+    const without = board.columns.filter((c) => c.id !== columnId);
+    const activeIndex = board.columns.findIndex((c) => c.id === columnId);
+    const overIndex = board.columns.findIndex((c) => c.id === overCol!.id);
+    let idx = without.findIndex((c) => c.id === overCol!.id);
+    if (activeIndex < overIndex) idx += 1;
+
+    const prev = without[idx - 1];
+    const next = without[idx];
+    const position =
+      prev && next
+        ? (prev.position + next.position) / 2
+        : next
+          ? next.position - 1
+          : prev
+            ? prev.position + 1
+            : 1;
+
+    queryClient.setQueryData(boardQuery.queryKey, (old: Board | undefined) => {
+      if (!old) return old;
+      return {
+        ...old,
+        columns: old.columns
+          .map((c) => (c.id === columnId ? { ...c, position } : c))
+          .sort((a, b) => a.position - b.position),
+      };
+    });
+
+    moveColumn({ columnId, position });
+  }
+
   return (
     <main className="flex w-full flex-1 flex-col gap-5 p-4 py-6">
       <div className="flex items-center justify-between gap-3">
@@ -232,27 +295,42 @@ function RouteComponent() {
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onDragCancel={() => setActiveCard(null)}
+        onDragCancel={() => {
+          setActiveCard(null);
+          setActiveColumn(null);
+        }}
       >
         {/* px/pt give focus rings (3px box-shadows, clipped by the scroll
             container on BOTH axes — overflow-x:auto forces overflow-y:auto)
             room to render at the container edges. */}
         <div className="flex flex-1 items-start gap-4 overflow-x-auto px-1 pt-1 pb-4">
-          {visibleColumns.map((column) => (
-            <ColumnSection
-              key={column.id}
-              column={column}
-              isDraggingCard={activeCard !== null}
-              onOpenCard={setOpenCardId}
-              onCreated={invalidateBoard}
-            />
-          ))}
+          <SortableContext
+            items={visibleColumns.map((c) => c.id)}
+            strategy={horizontalListSortingStrategy}
+          >
+            {visibleColumns.map((column) => (
+              <ColumnSection
+                key={column.id}
+                column={column}
+                isDraggingCard={activeCard !== null}
+                onOpenCard={setOpenCardId}
+                onChanged={invalidateBoard}
+              />
+            ))}
+          </SortableContext>
 
           <AddColumn boardId={board.id} onCreated={invalidateBoard} />
         </div>
 
         <DragOverlay>
           {activeCard && <CardVisual card={activeCard} className="rotate-2" />}
+          {activeColumn && (
+            <div className="w-72 rounded-lg border border-primary/50 bg-card-background p-2.5 opacity-90">
+              <div className="px-1 text-sm font-semibold">
+                {activeColumn.name}
+              </div>
+            </div>
+          )}
         </DragOverlay>
       </DndContext>
 
@@ -273,29 +351,113 @@ function ColumnSection({
   column,
   isDraggingCard,
   onOpenCard,
-  onCreated,
+  onChanged,
 }: {
   column: Board["columns"][number];
   isDraggingCard: boolean;
   onOpenCard: (cardId: string) => void;
-  onCreated: () => void;
+  onChanged: () => void;
 }) {
-  // Columns are droppable themselves so cards can land in empty ones.
-  const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  // Sortable (column reordering) AND droppable (cards land here, incl. empty
+  // columns). Drag listeners go on the header handle only, so card clicks /
+  // the rename input still work.
+  const {
+    setNodeRef,
+    attributes,
+    listeners,
+    transform,
+    transition,
+    isDragging,
+    isOver,
+  } = useSortable({ id: column.id, data: { type: "column" } });
+
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(column.name);
+
+  const { mutate: renameColumn } = useMutation(
+    rpc.board.renameColumn.mutationOptions({ onSuccess: onChanged }),
+  );
+  const { mutate: deleteColumn } = useMutation(
+    rpc.board.deleteColumn.mutationOptions({ onSuccess: onChanged }),
+  );
+
+  function commitRename() {
+    setEditing(false);
+    const trimmed = name.trim();
+    if (trimmed && trimmed !== column.name) {
+      renameColumn({ columnId: column.id, name: trimmed });
+    } else {
+      setName(column.name);
+    }
+  }
 
   return (
     <section
       ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         "flex w-72 shrink-0 flex-col gap-2 rounded-lg border border-card-border bg-card-background p-2.5 transition-colors",
         isDraggingCard && isOver && "border-primary/60 bg-accent",
+        isDragging && "opacity-40",
       )}
     >
-      <header className="flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold">{column.name}</h2>
+      <header className="group flex items-center gap-1">
+        <button
+          type="button"
+          aria-label="Drag column"
+          className="cursor-grab text-muted-foreground2 hover:text-foreground active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVerticalIcon className="size-4" />
+        </button>
+
+        {editing ? (
+          <Input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitRename();
+              } else if (e.key === "Escape") {
+                setName(column.name);
+                setEditing(false);
+              }
+            }}
+            className="h-6 px-1.5 py-0 text-sm font-semibold"
+          />
+        ) : (
+          <h2
+            className="flex-1 cursor-text truncate text-sm font-semibold"
+            onClick={() => setEditing(true)}
+            title="Click to rename"
+          >
+            {column.name}
+          </h2>
+        )}
+
         <span className="text-xs text-muted-foreground2">
           {column.cards.length}
         </span>
+        <button
+          type="button"
+          aria-label={`Delete ${column.name}`}
+          onClick={() => {
+            if (
+              window.confirm(
+                `Delete column "${column.name}" and its ${column.cards.length} card(s)?`,
+              )
+            ) {
+              deleteColumn({ columnId: column.id });
+            }
+          }}
+          className="invisible text-muted-foreground hover:text-destructive group-hover:visible"
+        >
+          <Trash2Icon className="size-3.5" />
+        </button>
       </header>
 
       <SortableContext
@@ -307,7 +469,7 @@ function ColumnSection({
         ))}
       </SortableContext>
 
-      <AddCard columnId={column.id} onCreated={onCreated} />
+      <AddCard columnId={column.id} onCreated={onChanged} />
     </section>
   );
 }

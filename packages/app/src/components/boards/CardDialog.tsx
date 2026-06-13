@@ -136,6 +136,12 @@ export function CardDialog({
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                save();
+              }
+            }}
             className="text-lg! font-semibold"
             placeholder="Card title"
           />
@@ -147,7 +153,8 @@ export function CardDialog({
             namespace={`card-${card.id}`}
             initialState={card.description ?? undefined}
             onChange={(json) => (descriptionRef.current = json)}
-            placeholder="Details, links, code…"
+            onSubmit={save}
+            placeholder="Details, links, code… (⌘/Ctrl+Enter to save)"
           />
         </div>
 
