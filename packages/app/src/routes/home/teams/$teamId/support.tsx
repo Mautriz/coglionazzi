@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   CheckIcon,
+  CodeIcon,
   CopyIcon,
   ExternalLinkIcon,
   LifeBuoyIcon,
@@ -169,14 +170,21 @@ function ClientSupportLink({ teamId }: { teamId: string }) {
       onError: (e) => toast.error(e.message),
     }),
   );
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"link" | "embed" | null>(null);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   if (widget?.widgetKey) {
     const url = `${origin}/widget?key=${widget.widgetKey}`;
+    const snippet = `<script src="${origin}/widget.js" data-widget-key="${widget.widgetKey}" data-position="left"></script>`;
+    const copy = (what: "link" | "embed", text: string, label: string) => {
+      navigator.clipboard.writeText(text);
+      setCopied(what);
+      toast.success(label);
+      setTimeout(() => setCopied(null), 1500);
+    };
     return (
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <Button asChild size="sm" variant="outline">
           <a href={url} target="_blank" rel="noreferrer">
             <ExternalLinkIcon className="size-4" />
@@ -187,19 +195,27 @@ function ClientSupportLink({ teamId }: { teamId: string }) {
           type="button"
           size="sm"
           variant="ghost"
-          onClick={() => {
-            navigator.clipboard.writeText(url);
-            setCopied(true);
-            toast.success("Client link copied");
-            setTimeout(() => setCopied(false), 1500);
-          }}
+          onClick={() => copy("link", url, "Client link copied")}
         >
-          {copied ? (
+          {copied === "link" ? (
             <CheckIcon className="size-4" />
           ) : (
             <CopyIcon className="size-4" />
           )}
           Copy link
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => copy("embed", snippet, "Embed snippet copied")}
+        >
+          {copied === "embed" ? (
+            <CheckIcon className="size-4" />
+          ) : (
+            <CodeIcon className="size-4" />
+          )}
+          Copy widget
         </Button>
       </div>
     );
