@@ -20,11 +20,19 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { MessageSquareIcon, PaperclipIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import {
+  LinkIcon,
+  MessageSquareIcon,
+  PaperclipIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { CardDialog } from "~/components/boards/CardDialog";
 import { TagBadge } from "~/components/boards/TagBadge";
+import { UserAvatar } from "~/components/custom/UserAvatar";
+import { cardMatchesFilters, isFilterActive } from "~/lib/cardFilters";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { rpc, type Outputs } from "~/lib/rpcClient";
@@ -32,8 +40,17 @@ import { cn } from "~/lib/classUtils";
 
 export const Route = createFileRoute("/home/boards/$boardId")({
   component: RouteComponent,
-  // ?card=<id> opens that card's dialog — used by global search results.
-  validateSearch: z.object({ card: z.string().optional() }),
+  // ?card=<id> opens that card's dialog (used by global search results);
+  // the rest are the board filters (see lib/cardFilters.ts), kept in the
+  // URL so filtered views are shareable.
+  validateSearch: z.object({
+    card: z.string().optional(),
+    q: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    assignees: z.array(z.string()).optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+  }),
   loader: ({ context, params }) =>
     context.queryClient.ensureQueryData(
       rpc.board.get.queryOptions({ input: { boardId: params.boardId } }),
@@ -74,14 +91,27 @@ function RouteComponent() {
   const [activeCard, setActiveCard] = useState<BoardCard | null>(null);
 
   // Search results deep-link to a card via ?card=; consume the param into
-  // local state (and drop it from the URL once handled).
-  const { card: cardParam } = Route.useSearch();
+  // local state (and drop it from the URL, keeping the filter params).
+  const { card: cardParam, ...filters } = Route.useSearch();
   useEffect(() => {
     if (cardParam) {
       setOpenCardId(cardParam);
-      navigate({ search: {}, replace: true });
+      navigate({
+        search: (prev) => ({ ...prev, card: undefined }),
+        replace: true,
+      });
     }
   }, [cardParam, navigate]);
+
+  const filtersActive = isFilterActive(filters);
+  const visibleColumns = filtersActive
+    ? board.columns.map((col) => ({
+        ...col,
+        cards: col.cards.filter((c) => cardMatchesFilters(c, filters)),
+      }))
+    : board.columns;
+  const totalCards = board.columns.reduce((n, c) => n + c.cards.length, 0);
+  const visibleCards = visibleColumns.reduce((n, c) => n + c.cards.length, 0);
 
   // A plain click must still open the card dialog — only start dragging
   // after the pointer travelled a bit.
@@ -163,7 +193,24 @@ function RouteComponent() {
   return (
     <main className="flex w-full flex-1 flex-col gap-5 p-4 py-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-2xl font-bold">{board.name}</h1>
+        <div className="flex items-baseline gap-3">
+          <h1 className="font-display text-2xl font-bold">{board.name}</h1>
+          {filtersActive && (
+            <span className="text-sm text-muted-foreground">
+              {visibleCards}/{totalCards} cards match
+              <Button
+                variant="link"
+                size="xs"
+                className="ml-1 text-link"
+                onClick={() =>
+                  navigate({ search: {}, replace: true })
+                }
+              >
+                clear filters
+              </Button>
+            </span>
+          )}
+        </div>
         <Button
           type="button"
           variant="ghost"
@@ -191,7 +238,7 @@ function RouteComponent() {
             container on BOTH axes — overflow-x:auto forces overflow-y:auto)
             room to render at the container edges. */}
         <div className="flex flex-1 items-start gap-4 overflow-x-auto px-1 pt-1 pb-4">
-          {board.columns.map((column) => (
+          {visibleColumns.map((column) => (
             <ColumnSection
               key={column.id}
               column={column}
@@ -212,6 +259,7 @@ function RouteComponent() {
       {openCard && (
         <CardDialog
           card={openCard}
+          boardCards={allCards.map((c) => ({ id: c.id, title: c.title }))}
           onClose={() => setOpenCardId(null)}
           onChanged={invalidateBoard}
         />
@@ -317,7 +365,9 @@ function CardVisual({
       <span className="text-sm">{card.title}</span>
       {(card.tags.length > 0 ||
         card.attachments.length > 0 ||
-        card.commentCount > 0) && (
+        card.commentCount > 0 ||
+        card.relations.length > 0 ||
+        card.assignees.length > 0) && (
         <span className="flex flex-wrap items-center gap-1.5">
           {card.tags.map((tag) => (
             <TagBadge key={tag} tag={tag} />
@@ -332,6 +382,36 @@ function CardVisual({
             <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground2">
               <MessageSquareIcon className="size-3" />
               {card.commentCount}
+            </span>
+          )}
+          {card.relations.length > 0 && (
+            <span
+              title={
+                card.relations.some((r) => r.kind === "blocked_by")
+                  ? "Blocked by another card"
+                  : "Linked cards"
+              }
+              className={cn(
+                "inline-flex items-center gap-0.5 text-xs",
+                card.relations.some((r) => r.kind === "blocked_by")
+                  ? "text-red1"
+                  : "text-muted-foreground2",
+              )}
+            >
+              <LinkIcon className="size-3" />
+              {card.relations.length}
+            </span>
+          )}
+          {card.assignees.length > 0 && (
+            <span className="ml-auto inline-flex -space-x-1.5">
+              {card.assignees.slice(0, 3).map((a) => (
+                <UserAvatar key={a.id} id={a.id} name={a.name} size="xs" />
+              ))}
+              {card.assignees.length > 3 && (
+                <span className="inline-flex size-5 items-center justify-center rounded-full bg-muted text-[9px] text-muted-foreground">
+                  +{card.assignees.length - 3}
+                </span>
+              )}
             </span>
           )}
         </span>

@@ -25,6 +25,19 @@ async function deleteCommentsOf(
 
 const DEFAULT_COLUMNS = ["To do", "Doing", "Done"];
 
+/** Delete any relation between two cards, regardless of direction. */
+async function clearRelation(a: string, b: string) {
+  await db
+    .deleteFrom("card_relations")
+    .where((eb) =>
+      eb.or([
+        eb.and([eb("card_id", "=", a), eb("related_card_id", "=", b)]),
+        eb.and([eb("card_id", "=", b), eb("related_card_id", "=", a)]),
+      ]),
+    )
+    .execute();
+}
+
 /** Next position at the end of a column (cards) or board (columns). */
 async function nextCardPosition(columnId: string): Promise<number> {
   const row = await db
@@ -134,6 +147,63 @@ export const boardRouter = {
             .execute()
         : [];
 
+      const assignees = cards.length
+        ? await db
+            .selectFrom("card_assignees")
+            .innerJoin("users", "users.id", "card_assignees.user_id")
+            .where(
+              "card_assignees.card_id",
+              "in",
+              cards.map((c) => c.id),
+            )
+            .select(["card_assignees.card_id", "users.id", "users.name"])
+            .execute()
+        : [];
+
+      // Relations are stored normalized (card_id < related_card_id) — fetch
+      // both directions for the board's cards and join the other side's
+      // title for display.
+      const cardIds = cards.map((c) => c.id);
+      const relations = cards.length
+        ? await db
+            .selectFrom("card_relations")
+            .innerJoin("cards as a", "a.id", "card_relations.card_id")
+            .innerJoin("cards as b", "b.id", "card_relations.related_card_id")
+            .where((eb) =>
+              eb.or([
+                eb("card_relations.card_id", "in", cardIds),
+                eb("card_relations.related_card_id", "in", cardIds),
+              ]),
+            )
+            .select([
+              "card_relations.card_id as aId",
+              "card_relations.related_card_id as bId",
+              "card_relations.kind",
+              "a.title as aTitle",
+              "b.title as bTitle",
+            ])
+            .execute()
+        : [];
+
+      // Kind from this card's perspective: a directed 'blocks' row reads as
+      // "blocks" from the blocker and "blocked_by" from the blocked card.
+      const relationsOf = (cardId: string) =>
+        relations
+          .filter((r) => r.aId === cardId || r.bId === cardId)
+          .map((r) =>
+            r.aId === cardId
+              ? {
+                  cardId: r.bId,
+                  title: r.bTitle,
+                  kind: r.kind === "blocks" ? ("blocks" as const) : ("related" as const),
+                }
+              : {
+                  cardId: r.aId,
+                  title: r.aTitle,
+                  kind: r.kind === "blocks" ? ("blocked_by" as const) : ("related" as const),
+                },
+          );
+
       const commentCounts = cards.length
         ? await db
             .selectFrom("comments")
@@ -156,6 +226,10 @@ export const boardRouter = {
         // jsonb comes back parsed; the editor wants the serialized string.
         description:
           card.description == null ? null : JSON.stringify(card.description),
+        assignees: assignees
+          .filter((a) => a.card_id === card.id)
+          .map((a) => ({ id: a.id, name: a.name })),
+        relations: relationsOf(card.id),
         // count(*) is bigint → pg hands it over as a string.
         commentCount: Number(
           commentCounts.find((c) => c.entity_id === card.id)?.count ?? 0,
@@ -231,24 +305,94 @@ export const boardRouter = {
         /** Serialized Lexical editor state. */
         description: z.string().nullable().optional(),
         tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+        /** Replaces the full assignee set when provided. */
+        assigneeIds: z.array(z.string()).max(50).optional(),
       }),
     )
     .handler(async (info) => {
-      const { cardId, ...patch } = info.input;
-      if (Object.keys(patch).length === 0) return;
+      const { cardId, assigneeIds, ...patch } = info.input;
 
+      if (Object.keys(patch).length > 0) {
+        await db
+          .updateTable("cards")
+          .set({
+            ...(patch.title !== undefined && { title: patch.title }),
+            ...(patch.description !== undefined && {
+              description: patch.description,
+              description_text: extractLexicalText(patch.description),
+            }),
+            ...(patch.tags !== undefined && { tags: patch.tags }),
+          })
+          .where("id", "=", cardId)
+          .execute();
+      }
+
+      if (assigneeIds !== undefined) {
+        await db
+          .deleteFrom("card_assignees")
+          .where("card_id", "=", cardId)
+          .execute();
+        if (assigneeIds.length > 0) {
+          await db
+            .insertInto("card_assignees")
+            .values(
+              assigneeIds.map((userId) => ({
+                card_id: cardId,
+                user_id: userId,
+              })),
+            )
+            .onConflict((oc) => oc.doNothing())
+            .execute();
+        }
+      }
+    }),
+
+  /** Link two cards. `kind` is from the perspective of `cardId`:
+   *  - "related":    plain undirected association
+   *  - "blocks":     cardId blocks relatedCardId (it depends on cardId)
+   *  - "blocked_by": cardId is blocked by relatedCardId
+   *  One relation per pair — adding replaces whatever was there. */
+  addRelation: authP
+    .input(
+      z.object({
+        cardId: z.uuid(),
+        relatedCardId: z.uuid(),
+        kind: z.enum(["related", "blocks", "blocked_by"]).default("related"),
+      }),
+    )
+    .handler(async (info) => {
+      const { cardId, relatedCardId, kind } = info.input;
+      if (cardId === relatedCardId) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "A card cannot relate to itself.",
+        });
+      }
+
+      // Normalize to a storage row: 'related' sorts the pair; 'blocked_by'
+      // is stored as the inverse 'blocks'.
+      let from: string;
+      let to: string;
+      let storedKind: "related" | "blocks";
+      if (kind === "related") {
+        [from, to] = [cardId, relatedCardId].sort() as [string, string];
+        storedKind = "related";
+      } else if (kind === "blocks") {
+        [from, to, storedKind] = [cardId, relatedCardId, "blocks"];
+      } else {
+        [from, to, storedKind] = [relatedCardId, cardId, "blocks"];
+      }
+
+      await clearRelation(cardId, relatedCardId);
       await db
-        .updateTable("cards")
-        .set({
-          ...(patch.title !== undefined && { title: patch.title }),
-          ...(patch.description !== undefined && {
-            description: patch.description,
-            description_text: extractLexicalText(patch.description),
-          }),
-          ...(patch.tags !== undefined && { tags: patch.tags }),
-        })
-        .where("id", "=", cardId)
+        .insertInto("card_relations")
+        .values({ card_id: from, related_card_id: to, kind: storedKind })
         .execute();
+    }),
+
+  removeRelation: authP
+    .input(z.object({ cardId: z.uuid(), relatedCardId: z.uuid() }))
+    .handler(async (info) => {
+      await clearRelation(info.input.cardId, info.input.relatedCardId);
     }),
 
   /** Move a card into a column. `position` (float, midpoint-of-neighbors

@@ -164,13 +164,25 @@ Run from repo root:
 ### Kanban boards
 
 - Schema: `boards` → `board_columns` (ordered by `position`) → `cards`
-  (`tags text[]`, `description` = serialized Lexical JSON, float `position`)
-  + `card_attachments` (card ↔ file). Everything is shared between all
-  logged-in users — no per-board permissions.
+  (`tags text[]`, `description` = serialized Lexical JSON, `description_text`
+  for search, float `position`) + `card_attachments` (card ↔ file),
+  `card_assignees` (card ↔ user, many-to-many), `card_relations` (card ↔
+  card). Everything is shared between all logged-in users — no per-board
+  permissions.
+- `card_relations` carries a `kind`: `'related'` is undirected (rows
+  normalized `card_id < related_card_id` so one row = both directions);
+  `'blocks'` is directed (`card_id` blocks `related_card_id`). The API
+  exposes three perspective kinds — `related`, `blocks`, `blocked_by` —
+  and normalizes `blocked_by` to a stored inverse `blocks`. One relation
+  per pair (addRelation clears the pair first). `board.get` resolves the
+  per-card kind from each card's point of view.
 - API: `rpc.board.*` in `src/server/orpc/boards.ts` — list/create/get,
   addColumn, createCard/updateCard/moveCard/deleteCard,
-  add/removeAttachment. `board.get` returns the fully nested board;
-  the UI invalidates that one query after any mutation.
+  add/removeAttachment, add/removeRelation. `updateCard` takes optional
+  `assigneeIds` (replaces the whole set). `rpc.user.list` feeds assignee
+  pickers. `board.get` returns the fully nested board (cards carry
+  `assignees`, `relations`, `commentCount`, `attachments`); the UI
+  invalidates that one query after any mutation.
 - Ordering uses float positions: the client computes midpoint-of-neighbors
   and sends it to `moveCard` (omitted position = append at end). Drag &
   drop is @dnd-kit (`DndContext` + per-column `SortableContext` +
@@ -180,9 +192,22 @@ Run from repo root:
   re-syncs. The PointerSensor uses `activationConstraint.distance` so
   plain clicks still open the card dialog.
 - Card editing happens in `~/components/boards/CardDialog` (title, lexical
-  description, tags via `<TagBadge>` hash-colored chips, attachments via
-  the upload helpers, comment thread at the bottom). `deleteBoard` /
-  `deleteCard` clean up the cards' comments (no FK — see below).
+  description, assignee chips, related-cards manager with a kind select,
+  tags via `<TagBadge>` hash-colored chips, attachments via the upload
+  helpers, comment thread at the bottom). `deleteBoard` / `deleteCard`
+  clean up the cards' comments (no FK — see below).
+- The boards section has its own left sidebar
+  (`~/components/boards/BoardsSidebar`, rendered under the global topbar by
+  `routes/home/boards/route.tsx`): board list + inline create, and — when
+  a board is open — the filters. The global topbar/nav (Home/Boards/Demo +
+  global search) stays on every page; `UserActions` (theme + logout) is
+  shared.
+- Filtering is client-side over the already-loaded board: pure functions in
+  `~/lib/cardFilters.ts` (`cardMatchesFilters`, `isFilterActive`) over the
+  board route's search params (`q`, `tags`, `assignees`, `from`, `to`) —
+  kept in the URL so filtered views are shareable. Date range compares UTC
+  calendar days (inclusive). `<UserAvatar>` renders hash-colored initials,
+  reused on cards and in the assignee filter.
 
 ### Comments (polymorphic)
 

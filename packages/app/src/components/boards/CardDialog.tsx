@@ -1,5 +1,5 @@
-import { useMutation } from "@tanstack/react-query";
-import { Trash2Icon, XIcon } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { ArrowLeftIcon, ArrowRightIcon, LinkIcon, Trash2Icon, XIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { TagBadge } from "~/components/boards/TagBadge";
@@ -8,6 +8,7 @@ import {
   FilePreview,
   UploadButton,
 } from "~/components/custom/FileUploads";
+import { UserAvatar } from "~/components/custom/UserAvatar";
 import { RichTextEditor } from "~/components/editor/RichTextEditor";
 import { Button } from "~/components/ui/button";
 import {
@@ -18,24 +19,49 @@ import {
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { cn } from "~/lib/classUtils";
 import { rpc, type Outputs } from "~/lib/rpcClient";
 
 type BoardCard =
   Outputs["board"]["get"]["columns"][number]["cards"][number];
 
-/** Edit a card: title, rich description (lexical), tags, attachments. */
+type RelationKind = "related" | "blocks" | "blocked_by";
+
+const RELATION_LABELS: Record<RelationKind, string> = {
+  related: "Related to",
+  blocks: "Blocks",
+  blocked_by: "Blocked by",
+};
+
+/** Edit a card: title, rich description (lexical), tags, assignees,
+ *  related cards, attachments, comments. */
 export function CardDialog({
   card,
+  boardCards,
   onClose,
   onChanged,
 }: {
   card: BoardCard;
+  /** All cards of the board (for the relation picker). */
+  boardCards: { id: string; title: string }[];
   onClose: () => void;
   onChanged: () => void;
 }) {
   const [title, setTitle] = useState(card.title);
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState(card.tags);
+  const [assigneeIds, setAssigneeIds] = useState(
+    card.assignees.map((a) => a.id),
+  );
+
+  const { data: users } = useQuery(rpc.user.list.queryOptions());
   // Description JSON is captured on every editor change but only persisted
   // on Save, like the rest of the card.
   const descriptionRef = useRef<string | null>(card.description);
@@ -67,6 +93,21 @@ export function CardDialog({
     rpc.board.removeAttachment.mutationOptions({ onSuccess: onChanged }),
   );
 
+  const { mutate: addRelation } = useMutation(
+    rpc.board.addRelation.mutationOptions({ onSuccess: onChanged }),
+  );
+
+  const { mutate: removeRelation } = useMutation(
+    rpc.board.removeRelation.mutationOptions({ onSuccess: onChanged }),
+  );
+
+  const [relationKind, setRelationKind] = useState<RelationKind>("related");
+  // Cards available for a new relation: not self, not already linked.
+  const relatableCards = boardCards.filter(
+    (c) =>
+      c.id !== card.id && !card.relations.some((r) => r.cardId === c.id),
+  );
+
   function addTag() {
     const tag = tagInput.trim();
     if (tag && !tags.includes(tag)) {
@@ -81,6 +122,7 @@ export function CardDialog({
       cardId: card.id,
       title,
       tags,
+      assigneeIds,
       description: descriptionRef.current,
     });
   }
@@ -106,6 +148,125 @@ export function CardDialog({
             onChange={(json) => (descriptionRef.current = json)}
             placeholder="Details, links, code…"
           />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label>Assignees</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {users?.map((user) => {
+              const active = assigneeIds.includes(user.id);
+              return (
+                <button
+                  key={user.id}
+                  type="button"
+                  onClick={() =>
+                    setAssigneeIds((ids) =>
+                      active
+                        ? ids.filter((id) => id !== user.id)
+                        : [...ids, user.id],
+                    )
+                  }
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full border border-card-border py-0.5 pl-0.5 pr-2.5 text-xs transition-colors hover:border-primary/40",
+                    active
+                      ? "bg-accent"
+                      : "opacity-55",
+                  )}
+                >
+                  <UserAvatar id={user.id} name={user.name} size="xs" />
+                  {user.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label>Related cards</Label>
+          {card.relations.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {card.relations.map((rel) => (
+                <div
+                  key={rel.cardId}
+                  className="group flex items-center gap-2 rounded-md border border-card-border bg-card-background px-2 py-1 text-sm"
+                >
+                  {rel.kind === "blocks" ? (
+                    <ArrowRightIcon className="size-3.5 shrink-0 text-orange1" />
+                  ) : rel.kind === "blocked_by" ? (
+                    <ArrowLeftIcon className="size-3.5 shrink-0 text-red1" />
+                  ) : (
+                    <LinkIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                  )}
+                  <span
+                    className={cn(
+                      "text-xs",
+                      rel.kind === "blocked_by"
+                        ? "text-red1"
+                        : rel.kind === "blocks"
+                          ? "text-orange1"
+                          : "text-muted-foreground",
+                    )}
+                  >
+                    {RELATION_LABELS[rel.kind]}
+                  </span>
+                  <span className="truncate">{rel.title}</span>
+                  <button
+                    type="button"
+                    aria-label="Remove relation"
+                    onClick={() =>
+                      removeRelation({
+                        cardId: card.id,
+                        relatedCardId: rel.cardId,
+                      })
+                    }
+                    className="invisible ml-auto text-muted-foreground hover:text-destructive group-hover:visible"
+                  >
+                    <XIcon className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {relatableCards.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Select
+                value={relationKind}
+                onValueChange={(v) => setRelationKind(v as RelationKind)}
+              >
+                <SelectTrigger className="h-8 w-32.5 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(RELATION_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value} className="text-xs">
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value=""
+                onValueChange={(relatedCardId) =>
+                  addRelation({
+                    cardId: card.id,
+                    relatedCardId,
+                    kind: relationKind,
+                  })
+                }
+              >
+                <SelectTrigger className="h-8 flex-1 text-xs">
+                  <SelectValue placeholder="Pick a card…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {relatableCards.map((c) => (
+                    <SelectItem key={c.id} value={c.id} className="text-xs">
+                      {c.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-1.5">

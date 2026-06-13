@@ -114,6 +114,22 @@ export interface CardAttachments {
   created_at: Generated<Timestamp>;
 }
 
+export interface CardAssignees {
+  card_id: string;
+  user_id: string;
+  created_at: Generated<Timestamp>;
+}
+
+/** Card↔card relation. kind 'related' is undirected (rows normalized with
+ *  card_id < related_card_id); kind 'blocks' is directed (card_id blocks
+ *  related_card_id). */
+export interface CardRelations {
+  card_id: string;
+  related_card_id: string;
+  kind: Generated<"related" | "blocks">;
+  created_at: Generated<Timestamp>;
+}
+
 export interface DB {
   comments: Comments;
   files: Files;
@@ -121,6 +137,8 @@ export interface DB {
   board_columns: BoardColumns;
   cards: Cards;
   card_attachments: CardAttachments;
+  card_assignees: CardAssignees;
+  card_relations: CardRelations;
   users: Users;
   sessions: Sessions;
   accounts: Accounts;
