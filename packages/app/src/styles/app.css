@@ -1,0 +1,358 @@
+@import "https://fonts.googleapis.com/css2?family=Inter&family=Baloo+2:wght@600;700;800&display=swap";
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Coglionazzi theme — PropFirmHub-style "electric cyan" brand.
+ * The @theme defaults ARE the dark palette ("deep-sea electric cyan"), so
+ * dark is the default look; the `.light` block flips to the near-white
+ * ice-cyan palette. The theme init script always puts `light`/`dark` on
+ * <html>, and `.dark` re-asserts the defaults so utilities that key off the
+ * class behave.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  --font-sans: "Inter", sans-serif;
+  /* Chunky rounded display face for the wordmark/headings — the same family
+   * the propfirmhub wordmark outlines were drawn from. */
+  --font-display: "Baloo 2", "Inter", sans-serif;
+
+  /* Brand — electric cyan → teal. */
+  --color-primary: #22d3ee;
+  --color-primary-foreground: #d7eef4;
+  --color-link: #38bdf8;
+  --color-ring: #22d3ee;
+  --color-gradient-from: #22d3ee;
+  --color-gradient-to: #0e7490;
+  --main-gradient: linear-gradient(
+    105deg,
+    #22d3ee 0%,
+    #0891b2 58%,
+    #38bdf8 125%
+  );
+
+  /* Surfaces — deep teal-navy; page darkest, cards one step above. */
+  --color-background: #04141b;
+  --color-foreground: #e3f6fb;
+  --color-card: #0a212b;
+  --color-card-foreground: #e3f6fb;
+  --color-card-border: rgba(34, 211, 238, 0.08);
+  --color-card-background: rgba(255, 255, 255, 0.04);
+  --color-popover: #0a212b;
+  --color-popover-foreground: #e3f6fb;
+
+  /* Teal-tinted hairlines + control fills. */
+  --color-border: #15323d;
+  --color-border1: #1c3a46;
+  --color-input: #0e2630;
+  --color-input-border: rgba(34, 211, 238, 0.08);
+  --color-input-background: rgba(255, 255, 255, 0.05);
+  --color-input-unfocused: #87a4ad;
+  --color-input-placeholder: #94a3b8;
+  --color-button-border: #15323d;
+  --color-button-background: rgba(10, 33, 43, 0.5);
+  --color-progress-background: rgba(255, 255, 255, 0.04);
+  --color-secondary: #112b35;
+  --color-secondary-foreground: #e3f6fb;
+  --color-accent: #123039;
+  --color-accent-foreground: #e3f6fb;
+  --color-muted: #0c2129;
+  --color-muted1: #9ab4bd;
+  --color-muted-foreground: #87a4ad;
+  --color-muted-foreground2: #9ab4bd;
+
+  --color-destructive: #ff4444;
+  --color-destructive-foreground: #e3f6fb;
+  --color-warning: #f59e0b;
+
+  /* Chrome (sidebar / topbar). */
+  --color-sidebar: #061b23;
+  --color-sidebar-foreground: #d7eef4;
+  --color-sidebar-primary: #22d3ee;
+  --color-sidebar-primary-foreground: #04222b;
+  --color-sidebar-accent: #0f2e38;
+  --color-sidebar-accent-foreground: #67e8f9;
+  --color-sidebar-border: #103039;
+  --color-sidebar-ring: #22d3ee;
+
+  --color-scrollbar-thumb: #123642;
+  --color-scrollbar-thumb-hover: rgba(34, 211, 238, 0.5);
+
+  /* Status hues (rankings, results, badges). */
+  --color-positive: oklch(0.7 0.15 220);
+  --color-negative: oklch(0.5 0.2 0);
+  --color-purple: oklch(0.6 0.2 280);
+  --color-yellow: oklch(0.8 0.2 90);
+  /* Foreground tokens for the purple/yellow button variants — must live in
+   * @theme so Tailwind v4 emits the utilities at all. */
+  --color-purple-foreground: #ffffff;
+  --color-yellow-foreground: #050510;
+  --color-green1: #2dd4a0;
+  --color-red1: #e97b7b;
+  --color-blue1: #3b82f6;
+  --color-orange1: #f59e0b;
+
+  --animate-accordion-down: accordion-down 0.1s ease-out;
+  --animate-accordion-up: accordion-up 0.1s ease-out;
+  --animate-pulse-custom: pulse-custom 1.5s cubic-bezier(0.4, 0, 0.6, 1)
+    infinite;
+  --animate-in: in 0.2s ease-out forwards;
+  --animate-out: out 0.2s ease-in forwards;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+
+  @keyframes pulse-custom {
+    0%,
+    100% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+
+  @keyframes in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+}
+
+/* ─────────────────────────────── Light theme ───────────────────────────────
+ * Near-white surfaces with the cyan brand (the PropFirmHub light palette).
+ * Solid cyan carries flat accents; the gradient is reserved for primary
+ * filled surfaces; bright sky-cyan drives focus rings. */
+.light {
+  --color-primary: #0891b2;
+  --color-link: #0891b2;
+  --color-ring: #22d3ee;
+  --color-gradient-from: #22d3ee;
+  --color-gradient-to: #0e7490;
+  --color-scrollbar-thumb: #c7ccd4;
+  --color-scrollbar-thumb-hover: rgba(8, 145, 178, 0.5);
+  --main-gradient: linear-gradient(
+    105deg,
+    #22d3ee 0%,
+    #0891b2 58%,
+    #38bdf8 125%
+  );
+
+  /* Near-white page + white cards; cards are lifted by a brand-tinted shadow
+   * (see the card rule below), not page contrast. */
+  --color-background: #fdfdfc;
+  --color-foreground: #0f1b24;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f1b24;
+  --color-card-background: rgba(15, 23, 42, 0.025);
+  --color-card-border: rgba(15, 23, 42, 0.07);
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f1b24;
+
+  /* Much of the app uses `text-primary-foreground` as its default readable
+   * body text (see the body rule below). Pin it dark here so loose text is
+   * readable; filled buttons wear `.special`, which re-overrides to white. */
+  --color-primary-foreground: #0f1b24;
+
+  --color-border: #e3e6ec;
+  --color-border1: #d4d8e0;
+  --color-input: #e3e6ec;
+  --color-input-border: rgba(15, 23, 42, 0.09);
+  --color-input-background: rgba(15, 23, 42, 0.025);
+  --color-input-unfocused: #64748b;
+  --color-input-placeholder: #94a3b8;
+  --color-button-background: #ffffff;
+  --color-button-border: #e2e5eb;
+  --color-progress-background: rgba(15, 23, 42, 0.05);
+
+  --color-muted: #eef0f4;
+  --color-muted1: #44545f;
+  --color-muted-foreground: #44545f;
+  --color-muted-foreground2: #566872;
+  --color-accent: #eef0f4;
+  --color-accent-foreground: #0f1b24;
+  --color-secondary: #eef0f4;
+  --color-secondary-foreground: #0f1b24;
+  --color-destructive-foreground: #ffffff;
+  --color-yellow-foreground: #0f1b24;
+
+  /* Brand-tinted chrome: soft ice-cyan wash. */
+  --color-sidebar: #f0fbff;
+  --color-sidebar-foreground: #0f1b24;
+  --color-sidebar-border: #cdeef6;
+  --color-sidebar-accent: #d8f4fb;
+  --color-sidebar-accent-foreground: #0e7490;
+  --color-sidebar-ring: #22d3ee;
+}
+
+/* Lift cards off the near-white page with a soft shadow + faint brand tint.
+ * `!important` guards against hover utilities swapping box-shadow. */
+.light [data-slot="card"],
+.light [data-slot="card"]:hover {
+  box-shadow:
+    0 2px 4px rgba(15, 27, 36, 0.08),
+    0 8px 20px -6px rgba(8, 145, 178, 0.2) !important;
+}
+
+/* Default (brand-fill) badge: restore white text on the cyan fill — scoped
+ * via `.bg-primary` so colored/outline variants stay untouched. */
+.light [data-slot="badge"].bg-primary {
+  --color-primary-foreground: #ffffff;
+  color: #ffffff;
+}
+
+/* Primary filled surfaces (`.special` utility): paint the brand gradient,
+ * white label with a faint shadow + soft brand glow. */
+.light .special {
+  --color-primary-foreground: #ffffff !important;
+  background-image: var(--main-gradient);
+  text-shadow: 0 1px 1px rgba(6, 28, 36, 0.35);
+  box-shadow: 0 2px 10px -3px rgba(8, 145, 178, 0.55);
+}
+.light .special:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 4px 14px -3px rgba(56, 189, 248, 0.6);
+}
+
+/* Readable white-on-brand text selection. */
+.light ::selection {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.light [data-slot="sidebar-inner"],
+.light [data-sidebar="sidebar"] {
+  background-image: linear-gradient(180deg, #f1fcff 0%, #e9f9fd 100%);
+}
+.light .app-topbar {
+  background-image: linear-gradient(90deg, #f0fbff 0%, #e9f8fd 100%);
+  border-color: #cdeef6;
+}
+
+/* ─────────────────────────────── Dark theme ───────────────────────────────
+ * "Deep-sea electric cyan" — same values as the @theme defaults; asserted
+ * under `.dark` so the class-based variants and the toggle behave. */
+.dark [data-slot="card"],
+.dark [data-slot="card"]:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.45),
+    0 10px 28px -10px rgba(34, 211, 238, 0.18) !important;
+}
+
+.dark [data-slot="sidebar-inner"],
+.dark [data-sidebar="sidebar"] {
+  background-image: linear-gradient(180deg, #082630 0%, #05171e 100%);
+}
+.dark .app-topbar {
+  background-image: linear-gradient(90deg, #082630 0%, #05171e 100%);
+  border-color: #103039;
+}
+
+/* Primary filled surfaces: cyan is light, so use a deep-teal label (better
+ * contrast than white over the bright cyan end) + a soft cyan glow. */
+.dark .special {
+  --color-primary-foreground: #04222b !important;
+  background-image: var(--main-gradient);
+  color: #04222b;
+  text-shadow: 0 1px 1px rgba(240, 253, 255, 0.25);
+  box-shadow: 0 2px 10px -3px rgba(34, 211, 238, 0.45);
+}
+.dark .special:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 4px 14px -3px rgba(56, 189, 248, 0.5);
+}
+
+.dark [data-slot="badge"].bg-primary {
+  --color-primary-foreground: #04222b;
+  color: #04222b;
+}
+
+.dark ::selection {
+  background-color: var(--color-primary);
+  color: #04222b;
+}
+
+/* ─────────────────────────────── Base layer ─────────────────────────────── */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  :root {
+    --radius: 0.2rem;
+    --space: 1rem;
+  }
+
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 6px;
+    border-radius: 40px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-scrollbar-thumb);
+    border-radius: 40px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--color-scrollbar-thumb-hover);
+  }
+
+  li {
+    list-style: none;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-primary-foreground;
+  }
+}
+
+/* Primary filled surfaces (buttons, etc.) opt in via `special`; the themed
+ * blocks above paint the gradient + readable label over it. */
+@utility special {
+  font-weight: 600 !important;
+}

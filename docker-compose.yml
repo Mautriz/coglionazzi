@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: coglionazzi
+    ports:
+      - "5460:5432"
+    volumes:
+      - coglionazzi_data:/var/lib/postgresql
+
+volumes:
+  coglionazzi_data: {}

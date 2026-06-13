@@ -1,0 +1,59 @@
+{
+  "name": "@this/app",
+  "private": true,
+  "sideEffects": false,
+  "type": "module",
+  "scripts": {
+    "dev": "dotenv -e ../.env${ENV:+.${ENV}} -- vite dev",
+    "build": "dotenv -e ../.env${ENV:+.${ENV}} -- vite build && tsc --noEmit",
+    "start": "node --env-file-if-exists=../.env${ENV:+.${ENV}} .output/server/index.mjs",
+    "type-check": "tsc --noEmit",
+    "genDbTypes": "dotenv -e ../.env -- kysely-codegen",
+    "migrate": "dotenv -e ../.env -- kysely migrate:latest",
+    "rollback": "dotenv -e ../.env -- kysely migrate:down"
+  },
+  "dependencies": {
+    "@orpc/client": "^1.14.4",
+    "@orpc/server": "^1.14.4",
+    "@orpc/tanstack-query": "^1.14.4",
+    "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@tailwindcss/vite": "^4.2.2",
+    "@tanstack/react-form": "^1.33.0",
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-query-devtools": "^5.101.0",
+    "@tanstack/react-router": "^1.170.11",
+    "@tanstack/react-router-devtools": "^1.167.0",
+    "@tanstack/react-start": "^1.168.19",
+    "better-auth": "^1.6.14",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "kysely": "^0.28.17",
+    "kysely-codegen": "^0.19.0",
+    "kysely-ctl": "^0.20.0",
+    "lucide-react": "^0.563.0",
+    "nitro": "^3.0.260311-beta",
+    "pg": "^8.18.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tanstack/react-router-ssr-query": "^1.167.1",
+    "@types/node": "^25.1.0",
+    "@types/pg": "^8.16.0",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.2",
+    "vite-tsconfig-paths": "^6.0.5"
+  },
+  "kysely-codegen": {
+    "outFile": "./src/server/dbtypes.ts",
+    "numericParser": "number"
+  }
+}

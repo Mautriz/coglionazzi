@@ -1,0 +1,22 @@
+{
+  "name": "coglionazzi-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --filter=@this/app...",
+    "build": "turbo run build",
+    "start": "npm run start -w @this/app",
+    "type-check": "turbo run type-check",
+    "lint": "turbo run lint",
+    "migrate": "npm run migrate -w @this/app",
+    "rollback": "npm run rollback -w @this/app",
+    "genDbTypes": "npm run genDbTypes -w @this/app",
+    "turbo": "turbo"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^8.0.0",
+    "turbo": "^2.8.20"
+  }
+}

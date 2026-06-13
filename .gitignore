@@ -1,0 +1,12 @@
+node_modules
+.output
+dist
+.turbo
+.tanstack
+.nitro
+*.local
+packages/.env
+packages/.env.*
+!packages/.env.example
+.claude/settings.local.json
+src/routeTree.gen.ts
