@@ -93,6 +93,17 @@ export interface Cards {
   created_at: Generated<Timestamp>;
 }
 
+export interface Comments {
+  id: Generated<string>;
+  /** Commentable entity kind — see `commentEntityType` in the comments router. */
+  entity_type: string;
+  entity_id: string;
+  /** Serialized Lexical editor state (JSON). */
+  body: unknown;
+  created_by: string | null;
+  created_at: Generated<Timestamp>;
+}
+
 export interface CardAttachments {
   card_id: string;
   file_id: string;
@@ -100,6 +111,7 @@ export interface CardAttachments {
 }
 
 export interface DB {
+  comments: Comments;
   files: Files;
   boards: Boards;
   board_columns: BoardColumns;

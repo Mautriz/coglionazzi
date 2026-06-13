@@ -131,6 +131,7 @@ export function RichTextEditor({
   placeholder = "Write something…",
   className,
   namespace = "editor",
+  readOnly = false,
 }: {
   /** Serialized editor state JSON (from `onChange`). */
   initialState?: string;
@@ -138,11 +139,14 @@ export function RichTextEditor({
   placeholder?: string;
   className?: string;
   namespace?: string;
+  /** Render-only: no toolbar, no chrome, not editable. */
+  readOnly?: boolean;
 }) {
   const initialConfig = {
     namespace,
     theme,
     editorState: initialState,
+    editable: !readOnly,
     onError(error: Error) {
       console.error(error);
     },
@@ -167,19 +171,25 @@ export function RichTextEditor({
     <LexicalComposer initialConfig={initialConfig}>
       <div
         className={cn(
-          "rounded-md border border-input-border bg-input-background focus-within:border-ring/60",
+          !readOnly &&
+            "rounded-md border border-input-border bg-input-background focus-within:border-ring/60",
           className,
         )}
       >
-        <ToolbarPlugin />
+        {!readOnly && <ToolbarPlugin />}
         <div className="editor-shell">
           <RichTextPlugin
             contentEditable={
               <ContentEditable
-                className="editor-input"
-                aria-placeholder={placeholder}
-                placeholder={
-                  <div className="editor-placeholder">{placeholder}</div>
+                className={cn(
+                  "editor-input",
+                  readOnly && "min-h-0! p-0!",
+                )}
+                aria-placeholder={readOnly ? "" : placeholder}
+                placeholder={() =>
+                  readOnly ? null : (
+                    <div className="editor-placeholder">{placeholder}</div>
+                  )
                 }
               />
             }

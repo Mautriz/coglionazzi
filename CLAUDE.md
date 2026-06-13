@@ -170,11 +170,32 @@ Run from repo root:
   addColumn, createCard/updateCard/moveCard/deleteCard,
   add/removeAttachment. `board.get` returns the fully nested board;
   the UI invalidates that one query after any mutation.
-- Ordering uses float positions; new/moved cards append at
-  `max(position)+1` in the target column. Card moves use native HTML5
-  drag & drop (`routes/home/boards/$boardId.tsx`); card editing happens in
-  `~/components/boards/CardDialog` (title, lexical description, tags via
-  `<TagBadge>` hash-colored chips, attachments via the upload helpers).
+- Ordering uses float positions: the client computes midpoint-of-neighbors
+  and sends it to `moveCard` (omitted position = append at end). Drag &
+  drop is @dnd-kit (`DndContext` + per-column `SortableContext` +
+  `useDroppable` columns + `DragOverlay`) in
+  `routes/home/boards/$boardId.tsx`, with an optimistic
+  `queryClient.setQueryData` so cards don't snap back; `onSettled`
+  re-syncs. The PointerSensor uses `activationConstraint.distance` so
+  plain clicks still open the card dialog.
+- Card editing happens in `~/components/boards/CardDialog` (title, lexical
+  description, tags via `<TagBadge>` hash-colored chips, attachments via
+  the upload helpers, comment thread at the bottom). `deleteBoard` /
+  `deleteCard` clean up the cards' comments (no FK — see below).
+
+### Comments (polymorphic)
+
+- `comments(entity_type, entity_id, body jsonb, created_by, …)` attaches a
+  thread to any entity. Commentable kinds live in the `commentEntityType`
+  zod enum (`src/server/orpc/comments.ts`) — extend it AND delete the
+  entity's comments in its delete procedure (no FK on `entity_id`;
+  see `deleteCommentsOf` in the boards router).
+- API: `rpc.comment.list/add/delete` (delete = author-only). UI:
+  `<CommentsSection entityType=… entityId=… />` — Lexical composer +
+  read-only rendering (`<RichTextEditor readOnly>`).
+- Gotcha: jsonb columns come back from pg as parsed objects — serialize
+  with `JSON.stringify` when returning editor states to the client (the
+  editor's `initialState` wants the string).
 
 ### Misc
 

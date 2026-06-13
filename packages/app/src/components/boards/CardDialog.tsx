@@ -3,6 +3,7 @@ import { Trash2Icon, XIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { TagBadge } from "~/components/boards/TagBadge";
+import { CommentsSection } from "~/components/custom/CommentsSection";
 import {
   FilePreview,
   UploadButton,
@@ -92,7 +93,7 @@ export function CardDialog({
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="!text-lg font-semibold"
+            className="text-lg! font-semibold"
             placeholder="Card title"
           />
         </DialogHeader>
@@ -173,6 +174,15 @@ export function CardDialog({
               }
             />
           </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label>Comments</Label>
+          <CommentsSection
+            entityType="card"
+            entityId={card.id}
+            onCountChanged={onChanged}
+          />
         </div>
 
         <div className="mt-2 flex items-center justify-between">

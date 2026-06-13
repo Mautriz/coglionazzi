@@ -9,6 +9,7 @@ import {
 } from "../files";
 import { authP, getAuthSession, t } from "./base";
 import { boardRouter } from "./boards";
+import { commentRouter } from "./comments";
 
 export const appRouter = {
   file: {
@@ -80,6 +81,7 @@ export const appRouter = {
     }),
   },
   board: boardRouter,
+  comment: commentRouter,
   auth: {
     getSession: t.handler(async (info) => {
       if (!info.context.reqHeaders) {

@@ -4,6 +4,7 @@
   "workspaces": [
     "packages/*"
   ],
+  "packageManager": "npm@11.7.0",
   "scripts": {
     "dev": "turbo run dev --filter=@this/app...",
     "build": "turbo run build",

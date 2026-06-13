@@ -3,6 +3,21 @@ import { z } from "zod";
 import { db } from "../db";
 import { fileUrl, type FileMetadata } from "../files";
 import { authP } from "./base";
+import type { CommentEntityType } from "./comments";
+
+/** Comments have no FK on entity_id (polymorphic) — entity owners call this
+ *  from their delete procedures. */
+async function deleteCommentsOf(
+  entityType: CommentEntityType,
+  entityIds: string[],
+) {
+  if (entityIds.length === 0) return;
+  await db
+    .deleteFrom("comments")
+    .where("entity_type", "=", entityType)
+    .where("entity_id", "in", entityIds)
+    .execute();
+}
 
 /** Kanban boards. Everything is shared between all logged-in users —
  *  it's a friends-crew app, there are no per-board permissions. */
@@ -115,9 +130,30 @@ export const boardRouter = {
             .execute()
         : [];
 
+      const commentCounts = cards.length
+        ? await db
+            .selectFrom("comments")
+            .where("entity_type", "=", "card")
+            .where(
+              "entity_id",
+              "in",
+              cards.map((c) => c.id),
+            )
+            .select(({ fn }) => [
+              "entity_id",
+              fn.count<number>("id").as("count"),
+            ])
+            .groupBy("entity_id")
+            .execute()
+        : [];
+
       const cardsWithExtras = cards.map((card) => ({
         ...card,
-        description: card.description as string | null,
+        // jsonb comes back parsed; the editor wants the serialized string.
+        description:
+          card.description == null ? null : JSON.stringify(card.description),
+        commentCount:
+          commentCounts.find((c) => c.entity_id === card.id)?.count ?? 0,
         attachments: attachments
           .filter((a) => a.card_id === card.id)
           .map((a) => ({
@@ -208,15 +244,24 @@ export const boardRouter = {
         .execute();
     }),
 
-  /** Move a card to (the end of) another column. */
+  /** Move a card into a column. `position` (float, midpoint-of-neighbors
+   *  computed client-side) places it precisely; omitted = append at end. */
   moveCard: authP
-    .input(z.object({ cardId: z.uuid(), columnId: z.uuid() }))
+    .input(
+      z.object({
+        cardId: z.uuid(),
+        columnId: z.uuid(),
+        position: z.number().finite().optional(),
+      }),
+    )
     .handler(async (info) => {
       await db
         .updateTable("cards")
         .set({
           column_id: info.input.columnId,
-          position: await nextCardPosition(info.input.columnId),
+          position:
+            info.input.position ??
+            (await nextCardPosition(info.input.columnId)),
         })
         .where("id", "=", info.input.cardId)
         .execute();
@@ -225,7 +270,31 @@ export const boardRouter = {
   deleteCard: authP
     .input(z.object({ cardId: z.uuid() }))
     .handler(async (info) => {
+      await deleteCommentsOf("card", [info.input.cardId]);
       await db.deleteFrom("cards").where("id", "=", info.input.cardId).execute();
+    }),
+
+  deleteBoard: authP
+    .input(z.object({ boardId: z.uuid() }))
+    .handler(async (info) => {
+      // Comments have no FK to cards — collect the board's card ids and
+      // clean theirs up before the cascade wipes columns/cards/attachments.
+      const cards = await db
+        .selectFrom("cards")
+        .innerJoin("board_columns", "board_columns.id", "cards.column_id")
+        .where("board_columns.board_id", "=", info.input.boardId)
+        .select("cards.id")
+        .execute();
+
+      await deleteCommentsOf(
+        "card",
+        cards.map((c) => c.id),
+      );
+
+      await db
+        .deleteFrom("boards")
+        .where("id", "=", info.input.boardId)
+        .execute();
     }),
 
   addAttachment: authP
