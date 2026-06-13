@@ -48,6 +48,10 @@ interface RealtimeEvents {
   comment: { entityType: string; entityId: string };
   /** A board's set of current viewers changed. */
   presence: { boardId: string; viewers: PresenceViewer[] };
+  /** The app-wide set of connected (logged-in) users changed — the header
+   *  count subscribers refresh. Carries the full roster (it's tiny) so the
+   *  count is `.length` and a tooltip can list who's online. */
+  globalPresence: { viewers: PresenceViewer[] };
   /** A team's membership or board set changed (board added/removed, member
    *  added/removed, rename, delete) — workspace subscribers refetch their
    *  `team.list`/`board.list`. `affectedUserIds` carries members whose OWN

@@ -13,6 +13,7 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { DeckStats } from "~/components/games/DeckStats";
+import { LiveDot } from "~/components/custom/LiveDot";
 import { MessageThread } from "~/components/custom/MessageThread";
 import { UserAvatar } from "~/components/custom/UserAvatar";
 import { Button } from "~/components/ui/button";
@@ -52,7 +53,7 @@ function RouteComponent() {
 
   return (
     <main className="flex w-full flex-1 flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-      <Header session={session} />
+      <Header session={session} watching={players?.length ?? null} />
       {/* Game on the left, the session's chat on the right (stacks below on
           mobile). The SAME room backs the lobby, the live matchup and the
           results — so banter carries through the whole game. */}
@@ -94,7 +95,15 @@ function GameChat({ sessionId }: { sessionId: string }) {
   );
 }
 
-function Header({ session }: { session: Session }) {
+function Header({
+  session,
+  watching,
+}: {
+  session: Session;
+  /** Live count of users connected to this session (any phase), or null until
+   *  the presence stream seeds. Distinct from the frozen voter roster. */
+  watching: number | null;
+}) {
   function share() {
     navigator.clipboard.writeText(window.location.href);
     toast("Link copied — send it to your friends");
@@ -109,6 +118,15 @@ function Header({ session }: { session: Session }) {
         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground2">
           <LockIcon className="size-3" />
           private
+        </span>
+      )}
+      {watching !== null && (
+        <span
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+          title={`${watching} connected to this game`}
+        >
+          <LiveDot />
+          {watching} watching
         </span>
       )}
       <Button

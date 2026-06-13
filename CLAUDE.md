@@ -85,6 +85,7 @@ packages/
         │   ├── realtime/
         │   │   ├── publisher.ts   # shared EventPublisher + chatPublisher (room-keyed)
         │   │   ├── presence.ts    # in-memory per-board viewer registry
+        │   │   ├── globalPresence.ts # in-memory app-wide connected-user registry
         │   │   ├── gamePublisher.ts # session-keyed game events + lobby presence
         │   │   └── versusEngine.ts  # in-memory Versus bracket state machine + timer
         │   └── orpc/
@@ -92,6 +93,7 @@ packages/
         │       ├── roomAccess.ts  # chat room ref/resolve/access (per-kind)
         │       ├── chat.ts        # chat.* (rooms + messages + reactions + subscribe)
         │       ├── presence.ts    # presence.subscribe Event Iterator
+        │       ├── globalPresence.ts # globalPresence.subscribe (app-wide online roster)
         │       ├── game/          # decks + sessions (lobby) + versus module + access
         │       ├── router.ts      # appRouter — add feature routers here
         │       └── client.ts      # createAppClient → typed client + query utils
@@ -499,7 +501,12 @@ Postgres + a `uploads` volume for assets.
   Access via `assertSessionAccess`: **public** → any logged-in user; **private**
   → unlisted / join-by-link (any logged-in user with the link), UNLESS an
   OPTIONAL `team_id` is set, in which case `assertTeamMember` (link works for that
-  team only). No FK on `team_id` (mirrors chat rooms).
+  team only). No FK on `team_id` (mirrors chat rooms). **Empty lobbies auto-close
+  instantly:** when the last viewer leaves a `lobby`-status session's live
+  presence (`subscribe`'s `finally`), `closeEmptyLobby` hard-deletes the session
+  + its game chat room (no-op once the game is `active` — a frozen roster is
+  kept). Single instance: a restart loses presence, so a lobby orphaned across a
+  restart isn't reaped (same constraint as the engine timer).
 - **Versus** = single-elimination left/right bracket (`versus_matchups` +
   `versus_votes`). Host `start({sessionId,cardCount})` (power-of-2 ≤ deck size):
   freezes the present players as the roster, draws a RANDOM subset, seeds round 1,
@@ -605,6 +612,15 @@ Postgres + a `uploads` volume for assets.
   yields the current roster immediately then on every join/leave, and
   deregisters in its `finally` (run when oRPC aborts the generator on socket
   close). `<PresenceStack>` renders the live avatar stack on the board.
+  There are THREE presence registries, same shape (in-memory, deduped by
+  user, leave-in-`finally`): per-board (`presence.ts`), per-game-session
+  (`gamePublisher.ts`), and **app-wide** (`globalPresence.ts` +
+  `orpc/globalPresence.ts`, on the shared `globalPresence` channel).
+  `globalPresence.subscribe` (any logged-in user, no entity check) streams the
+  full roster; `<ConnectedUsersCount>` renders the topbar online count + a
+  hover roster (shared `<LiveDot>` motif). The game play view shows the same
+  live session-presence count as a persistent "N watching" badge in every
+  phase (it reuses `useGameSession`'s already-streamed `players`).
 - **Single instance** (see Deploy): the bus/presence registry live in one
   Node process. To scale horizontally, back `publisher` with Postgres
   LISTEN/NOTIFY — only `realtime/publisher.ts` changes. Traefik passes WS

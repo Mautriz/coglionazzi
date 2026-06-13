@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { MenuIcon } from "lucide-react";
+import { ConnectedUsersCount } from "~/components/custom/ConnectedUsersCount";
 import { Logo } from "~/components/custom/Logo";
 import { UserActions } from "~/components/custom/UserActions";
 import { Button } from "~/components/ui/button";
@@ -57,6 +58,7 @@ function RouteComponent() {
           </nav>
         </div>
         <div className="flex items-center justify-end gap-1 sm:gap-2">
+          <ConnectedUsersCount />
           <UserActions />
         </div>
       </header>

@@ -10,6 +10,7 @@ import { authP, resolveSession, t } from "./base";
 import { boardRouter } from "./boards";
 import { chatRouter } from "./chat";
 import { gameRouter } from "./game";
+import { globalPresenceRouter } from "./globalPresence";
 import { presenceRouter } from "./presence";
 import { searchRouter } from "./search";
 import { teamRouter } from "./teams";
@@ -86,6 +87,7 @@ export const appRouter = {
   archive: archiveRouter,
   chat: chatRouter,
   game: gameRouter,
+  globalPresence: globalPresenceRouter,
   presence: presenceRouter,
   search: searchRouter,
   team: teamRouter,
