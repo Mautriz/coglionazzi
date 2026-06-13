@@ -1,0 +1,116 @@
+# Production stack for dokploy (Traefik) — same shape as ../propanalyst's
+# deploy/compose.yml, trimmed to what coglionazzi needs: the app + its own
+# Postgres + a volume for uploaded assets.
+#
+# dokploy provides the external `dokploy-network` and a Traefik instance that
+# terminates TLS (letsencrypt) and routes to the app by Host rule — so the
+# app publishes NO host port; Traefik reaches it over dokploy-network. The
+# `internal` bridge carries app↔postgres traffic only.
+#
+# Required env (deploy/.env): APP_HOST, VITE_FRONTEND_URL, POSTGRES_PASSWORD,
+# AUTH_SECRET. The app migrates on start (entrypoint.sh).
+services:
+  app:
+    restart: always
+    build:
+      context: ..
+      dockerfile: packages/app/Dockerfile
+      args:
+        # Baked into the client bundle at build time, so it must be the
+        # public origin (https://$APP_HOST).
+        VITE_FRONTEND_URL: ${VITE_FRONTEND_URL}
+    environment:
+      NODE_ENV: production
+      TZ: UTC
+      PORT: "3000"
+      DATABASE_URL: postgres://coglionazzi:${POSTGRES_PASSWORD}@coglionazzi-postgres:5432/coglionazzi
+      AUTH_SECRET: ${AUTH_SECRET}
+      VITE_FRONTEND_URL: ${VITE_FRONTEND_URL}
+      # Uploaded files (images, pdfs, …) live on the `uploads` volume.
+      IMAGES_PATH: /app/uploads
+    networks:
+      - dokploy-network
+      - internal
+    volumes:
+      - uploads:/app/uploads
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.services.coglionazzi-app-svc.loadbalancer.server.port=3000
+
+      - traefik.http.routers.coglionazzi-app-web.rule=Host(`${APP_HOST}`)
+      - traefik.http.routers.coglionazzi-app-web.entrypoints=web
+      - traefik.http.routers.coglionazzi-app-web.service=coglionazzi-app-svc
+      - traefik.http.routers.coglionazzi-app-web.middlewares=redirect-to-https@file
+
+      - traefik.http.routers.coglionazzi-app-websecure.rule=Host(`${APP_HOST}`)
+      - traefik.http.routers.coglionazzi-app-websecure.entrypoints=websecure
+      - traefik.http.routers.coglionazzi-app-websecure.service=coglionazzi-app-svc
+      - traefik.http.routers.coglionazzi-app-websecure.tls.certresolver=letsencrypt
+    deploy:
+      mode: replicated
+      # Single replica: the uploads volume is node-local, so multiple
+      # replicas wouldn't share files.
+      replicas: 1
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 15s
+      update_config:
+        order: stop-first
+        failure_action: rollback
+
+  postgres:
+    # Fixed, DNS-valid container name so the app reaches it on the internal
+    # network at this host.
+    container_name: coglionazzi-postgres
+    image: postgres:18
+    restart: always
+    environment:
+      POSTGRES_USER: coglionazzi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: coglionazzi
+    volumes:
+      # postgres:18 wants a single mount at /var/lib/postgresql (it stores
+      # data in a version subdirectory).
+      - pg_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coglionazzi -d coglionazzi"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 15s
+
+volumes:
+  pg_data:
+    driver: local
+    name: coglionazzi-pg-data
+  uploads:
+    driver: local
+    name: coglionazzi-uploads
+
+networks:
+  # Provided by dokploy; Traefik routes to the app over it.
+  dokploy-network:
+    external: true
+  # Local bridge for app↔postgres only.
+  internal:
+    driver: bridge
+    name: coglionazzi-internal

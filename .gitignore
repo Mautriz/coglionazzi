@@ -11,3 +11,6 @@ packages/.env.*
 .claude/settings.local.json
 src/routeTree.gen.ts
 packages/app/data
+deploy/.env
+deploy/.env.*
+!deploy/.env.example

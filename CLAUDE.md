@@ -25,13 +25,18 @@ more (e.g. a `cron`) may be added later.
 ```
 package.json            # workspace root; turbo scripts proxy into @this/app
 turbo.json
-docker-compose.yml      # local Postgres on port 5460
+docker-compose.yml      # local DEV Postgres on port 5460
+deploy/                 # production stack (dokploy/Traefik) — see Deploy below
+├── compose.yml
+└── .env.example
 packages/
 ├── .env                # shared env, gitignored (.env.example is the template)
 └── app/
     ├── .config/kysely.config.ts   # kysely-ctl config (migrations)
     ├── migrations/                # timestamped Kysely migrations
     ├── components.json            # shadcn config
+    ├── Dockerfile                 # turbo-pruned build; entrypoint migrates + serves
+    ├── entrypoint.sh              # kysely migrate:latest (retry) → node .output
     ├── vite.config.ts             # envDir ".." → reads packages/.env; port 3300
     └── src/
         ├── router.tsx             # QueryClient (toast on errors) + router
@@ -76,6 +81,28 @@ Run from repo root:
 - `npm test` — vitest (needs Postgres up; uses a dedicated `coglionazzi_test` DB)
 - `npm run migrate` / `npm run rollback` — Kysely migrations (uses packages/.env)
 - `npm run genDbTypes` — regenerate `src/server/dbtypes.ts` from the live DB
+
+## Deploy
+
+Production runs as a Docker stack under dokploy/Traefik (same shape as
+`../propanalyst/deploy`), trimmed to what this app needs: the app + its own
+Postgres + a `uploads` volume for assets.
+
+- `deploy/compose.yml` — `app` (built from `packages/app/Dockerfile`) +
+  `postgres` (bundled, `coglionazzi-pg-data` volume) + `coglionazzi-uploads`
+  volume. The app joins the external `dokploy-network` (Traefik routes to it
+  by `Host(${APP_HOST})`, TLS via letsencrypt — no published host port) and
+  an `internal` bridge for app↔postgres. `IMAGES_PATH=/app/uploads`.
+- The image is a turbo-pruned multi-stage build. `VITE_FRONTEND_URL` is a
+  build ARG (baked into the client bundle) AND a runtime env (better-auth);
+  it must equal the public origin. `entrypoint.sh` runs
+  `kysely migrate:latest` (retrying until Postgres is up — swarm ignores
+  `depends_on`) then serves on `$PORT` (3000).
+- Env in `deploy/.env` (see `.env.example`): `APP_HOST`, `VITE_FRONTEND_URL`,
+  `POSTGRES_PASSWORD`, `AUTH_SECRET`. Deploy with
+  `docker compose up -d --build` from `deploy/`.
+- Local smoke-test without Traefik: add an override publishing the port
+  (`ports: ["8090:3000"]`) and `docker network create dokploy-network`.
 
 ## Conventions
 
