@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { z } from "zod";
 import { db } from "../db";
 import { extractLexicalText } from "../lexicalText";
+import { bumpTicketActivity } from "../support";
 import {
   chatPublisher,
   publishChat,
@@ -177,7 +178,7 @@ export const chatRouter = {
       }),
     )
     .handler(async (info) => {
-      await assertRoomAccess(info.context.user.id, info.input.roomId);
+      const room = await assertRoomAccess(info.context.user.id, info.input.roomId);
       const row = await db
         .insertInto("chat_messages")
         .values({
@@ -205,6 +206,11 @@ export const chatRouter = {
         reactions: [],
       };
       publishChat(info.input.roomId, { type: "created", message });
+      // An agent reply in a support room is the ticket's latest activity —
+      // bump it so the inbox re-sorts and other agents' lists refetch.
+      if (room.kind === "support" && room.owner_id) {
+        await bumpTicketActivity(room.owner_id);
+      }
       return message;
     }),
 

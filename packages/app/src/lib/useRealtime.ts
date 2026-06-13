@@ -45,6 +45,25 @@ export function useWorkspaceRealtime() {
   }, [updatedAt, queryClient]);
 }
 
+/** Subscribe to a team's support inbox and refetch `support.tickets.list`
+ *  whenever a ticket is created / changes status or category / gets a new
+ *  message. Signal-and-refetch, like `useBoardRealtime`. */
+export function useSupportInbox(teamId: string) {
+  const queryClient = useQueryClient();
+  const live = useQuery(
+    rpc.support.subscribe.experimental_liveOptions({
+      input: { teamId },
+      retry: true,
+    }),
+  );
+
+  const updatedAt = live.dataUpdatedAt;
+  useEffect(() => {
+    if (!updatedAt) return;
+    queryClient.invalidateQueries({ queryKey: rpc.support.tickets.list.key() });
+  }, [updatedAt, teamId, queryClient]);
+}
+
 /** Live roster of who is viewing this board (deduped by user). Returns the
  *  current viewer list, updating as people join/leave. */
 export function useBoardPresence(boardId: string) {

@@ -71,9 +71,11 @@ packages/
         │   │   └── teams/         # Teams section: route.tsx = TeamRail (rail lives
         │   │       │              #   ONLY here), index → first team, $teamId/
         │   │       │              #   (route.tsx = TeamPanel) → board/chat/archive
+        │   ├── widget.tsx        # public (no-auth) support widget — iframe content
         │   └── api/
         │       ├── auth/$.ts      # better-auth handler (GET/POST)
         │       ├── files.ts       # GET ?fileId= → streams an uploaded file
+        │       ├── support/       # PUBLIC widget endpoints (config/tickets/messages/stream-SSE)
         │       └── rpc/$.ts       # oRPC RPCHandler (ANY), prefix /api/rpc
         ├── server/                # server-only code
         │   ├── db.ts              # pg Pool + Kysely instance + dialect
@@ -82,6 +84,8 @@ packages/
         │   ├── ws/
         │   │   └── rpcHandler.ts  # crossws WS handler: upgrade auth + 5-min re-check
         │   ├── files.ts           # disk storage; optimizes images on upload (sharp)
+        │   ├── http.ts            # CORS + JSON/error helpers for the public support API
+        │   ├── support.ts         # shared support logic (tickets/messages) — router + widget
         │   ├── realtime/
         │   │   ├── publisher.ts   # shared EventPublisher + chatPublisher (room-keyed)
         │   │   ├── presenceRegistry.ts # shared keyed-presence primitive (dedupeByUser)
@@ -93,6 +97,7 @@ packages/
         │       ├── base.ts        # ORPCContext (+ connection), `t`, `authP`, resolveSession
         │       ├── roomAccess.ts  # chat room ref/resolve/access (per-kind)
         │       ├── chat.ts        # chat.* (rooms + messages + reactions + subscribe)
+        │       ├── support.ts     # support.* (tickets + categories + widget key) — agent side
         │       ├── presence.ts    # presence.subscribe Event Iterator
         │       ├── globalPresence.ts # globalPresence.subscribe (app-wide online roster)
         │       ├── game/          # decks + sessions (lobby) + versus module + access
@@ -431,9 +436,11 @@ Postgres + a `uploads` volume for assets.
   belongs to: `'global'` (owner_id NULL — the single app-wide room, any
   logged-in user), `'team'` (owner_id = team.id, members), `'card'` (owner_id
   = card.id, card access), `'game'` (owner_id = game_session.id, gated by
-  `assertSessionAccess` — the play view's persistent chat, see Games). Add a
-  kind (e.g. `dm`) + a branch in `roomAccess.ts`'s three switches (one room
-  ref per session = the same room across lobby / live / finished). NO FK on
+  `assertSessionAccess` — the play view's persistent chat, see Games), and
+  `'support'` (owner_id = support_ticket.id, gated by the ticket's team
+  membership — see Support). Add a kind (e.g. `dm`) + a branch in
+  `roomAccess.ts`'s three switches (one room ref per session = the same room
+  across lobby / live / finished). NO FK on
   `owner_id` and no `team_id` column — access and
   cleanup are resolved per-kind, mirroring the old polymorphic `comments`
   (which this REPLACED — there is no comments table anymore).
@@ -549,6 +556,60 @@ Postgres + a `uploads` volume for assets.
   preference). Only intrinsically-focused bits keep a cap (the versus duel's
   two portrait images, `max-w-2xl`, so they don't balloon on wide screens).
 
+### Support / helpdesk (+ embeddable widget)
+
+- Each team is a support **inbox**. A ticket's conversation REUSES the chat
+  model: a `chat_rooms` kind `'support'` (owner_id = ticket.id). **Sender
+  convention:** in a support room a message's `created_by IS NULL` is the
+  customer, a non-null user is an agent (team member) — so no change to
+  `chat_messages`. Spec: `docs/superpowers/specs/2026-06-14-support-system-design.md`.
+- Schema (`migrations/1770000000010_support.ts`): `support_categories`
+  (`team_id`, `name`, `position`, unique `(team_id,name)`); `support_tickets`
+  (`team_id`, `subject?`, `category_id` SET NULL, `status` `open|resolved`,
+  `requester_user_id?`/`requester_email?`/`requester_name?`, `access_token`
+  = the visitor's per-ticket secret, `last_message_at`/`resolved_at`); and
+  `teams.widget_key` (the public embeddable id, lazily set by
+  `support.enableWidget`). Deleting a team drops its tickets' `'support'`
+  rooms via `deleteTeamRooms` (no FK on owner_id).
+- Two access paths to the SAME room: **agents** use `rpc.chat.*` (the new
+  `support` branch in `roomAccess.ts` gates by team membership) — `chat.send`
+  bumps the ticket's activity when `room.kind === 'support'`; **visitors** use
+  the public endpoints (below). Shared logic is in `src/server/support.ts`
+  (`createTicket`, `appendCustomerMessage`, `loadWidgetMessages`,
+  `teamByWidgetKey`, `ticketByToken`, `bumpTicketActivity`) — visitor messages
+  are stored customer-side (`created_by NULL`, plain text wrapped via
+  `plainTextToLexical`) and published to `chatPublisher(roomId)` so agents'
+  open threads update live.
+- Agent API `rpc.support.*` (`src/server/orpc/support.ts`, team-gated):
+  `enableWidget`/`widgetKey`, `categories.{list,create,rename,reorder,delete}`,
+  `tickets.{list,get,create,setStatus,setCategory,setSubject}`, `subscribe`.
+  `tickets.create` is the in-app requester path (any logged-in user, no
+  membership needed — they're the customer; the message still lands
+  customer-side). Realtime: a new SHARED `support` channel
+  (`publishSupportChanged(teamId)`) → `support.subscribe` filters by team;
+  client hook `useSupportInbox` (signal-and-refetch of `tickets.list`).
+- Agent UI: a **Support space** in `<TeamPanel>` →
+  `routes/home/teams/$teamId/support.tsx` (inbox list + filters; ticket detail
+  = status toggle + category select + `<MessageThread roomRef={{scope:'support',
+  ticketId}}>`). Categories + the widget embed snippet are managed in
+  `<SupportSettings>` inside `TeamDialog`.
+- **Public widget** (visitors, cross-origin): `public/widget.js` is a vanilla
+  loader — `<script src=".../widget.js" data-widget-key="KEY">` injects a
+  bubble + a hidden `<iframe src="/widget?key=KEY">`. The `/widget` route
+  (`routes/widget.tsx`, no auth guard) is the iframe content — plain
+  `fetch`/`EventSource` (NOT oRPC) against `routes/api/support/*`:
+  `config` (team name + categories), `tickets` (POST: open a ticket → returns
+  `accessToken`), `messages` (GET history / POST append, authed by token),
+  `stream` (SSE of agent replies via `chatPublisher`). These set permissive
+  CORS (`src/server/http.ts`); the iframe calls are same-origin so only
+  `widget.js` is truly cross-origin. The widget stores its `accessToken` in
+  the iframe's localStorage to resume. Widget message UI renders `body_text`
+  (plain) and sends on Enter (a deliberate exception to the in-app
+  ⌘/Ctrl+Enter rule — it's an external, non-Lexical composer).
+- **Out of scope (v1):** rich text/attachments in the widget, agent
+  assignment, widget theming, email notifications, and spam rate-limiting on
+  the public `POST tickets` (the widget key is public) — the first follow-up.
+
 ### Realtime (WebSockets)
 
 - **Transport:** in the browser EVERY oRPC call goes over ONE persistent
@@ -582,16 +643,16 @@ Postgres + a `uploads` volume for assets.
   login/logout. Caveat: WS activity can't slide the session forward (no
   `Set-Cookie`); normal HTTP navigation refreshes it.
 - **Push = Event Iterators + `EventPublisher`** (`server/realtime/`).
-  `publisher` is an in-process pub/sub on three SHARED channels (`board`,
-  `presence`, `team`); payloads carry the entity id so subscription
-  procedures filter the shared channel. Mutations call
-  `publishBoard*`/`publishTeamChanged` after writing.
-  **Signal-and-refetch**: `board.subscribe`/`team.subscribe` yield a
-  contentless change signal; the client (`lib/useRealtime.ts` →
-  `useBoardRealtime`/`useWorkspaceRealtime`) invalidates `board.get` /
-  (`team.list`+`board.list`) and refetches. Subscriptions are team-gated like
-  everything else; add a `publish*` call when adding a new board/card/team
-  mutation.
+  `publisher` is an in-process pub/sub on SHARED channels (`board`,
+  `presence`, `globalPresence`, `team`, `support`); payloads carry the entity
+  id so subscription procedures filter the shared channel. Mutations call
+  `publishBoard*`/`publishTeamChanged`/`publishSupportChanged` after writing.
+  **Signal-and-refetch**: `board.subscribe`/`team.subscribe`/`support.subscribe`
+  yield a contentless change signal; the client (`lib/useRealtime.ts` →
+  `useBoardRealtime`/`useWorkspaceRealtime`/`useSupportInbox`) invalidates
+  `board.get` / (`team.list`+`board.list`) / `support.tickets.list` and
+  refetches. Subscriptions are team-gated like everything else; add a
+  `publish*` call when adding a new board/card/team/support mutation.
 - **`chat` = a SEPARATE room-keyed publisher** (`chatPublisher`, keyed by
   `roomId`, NOT a shared channel). Chat is high-frequency, so a message must
   only wake its OWN room's subscribers — a shared channel would wake every

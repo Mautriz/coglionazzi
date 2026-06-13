@@ -9,6 +9,7 @@ import {
 import {
   ArchiveIcon,
   KanbanIcon,
+  LifeBuoyIcon,
   MessagesSquareIcon,
   PlusIcon,
   Settings2Icon,
@@ -51,6 +52,7 @@ export function TeamPanel({
   const { boardId: activeBoardId } = useParams({ strict: false });
   const chatActive = !!matchRoute({ to: "/home/teams/$teamId/chat" });
   const archiveActive = !!matchRoute({ to: "/home/teams/$teamId/archive" });
+  const supportActive = !!matchRoute({ to: "/home/teams/$teamId/support" });
   // Filters live in the panel for BOTH the board view and the archive (same
   // place, same rail layout — unified).
   const filtersActive = !!activeBoardId || archiveActive;
@@ -169,6 +171,14 @@ export function TeamPanel({
           label="Chat"
         />
         <FeatureLink
+          to="/home/teams/$teamId/support"
+          teamId={teamId}
+          active={supportActive}
+          onNavigate={onNavigate}
+          icon={<LifeBuoyIcon className="size-4 shrink-0" />}
+          label="Support"
+        />
+        <FeatureLink
           to="/home/teams/$teamId/archive"
           teamId={teamId}
           active={archiveActive}
@@ -209,7 +219,10 @@ function FeatureLink({
   label,
   onNavigate,
 }: {
-  to: "/home/teams/$teamId/chat" | "/home/teams/$teamId/archive";
+  to:
+    | "/home/teams/$teamId/chat"
+    | "/home/teams/$teamId/archive"
+    | "/home/teams/$teamId/support";
   teamId: string;
   active: boolean;
   icon: React.ReactNode;

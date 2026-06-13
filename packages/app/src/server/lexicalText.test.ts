@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractLexicalText } from "./lexicalText";
+import { extractLexicalText, plainTextToLexical } from "./lexicalText";
 
 const wrap = (children: unknown[]) =>
   JSON.stringify({
@@ -45,5 +45,27 @@ describe("extractLexicalText", () => {
     const extracted = extractLexicalText(state);
     expect(extracted).not.toContain("paragraph");
     expect(extracted).not.toContain("root");
+  });
+});
+
+describe("plainTextToLexical", () => {
+  it("produces a valid editor state that round-trips back to the text", () => {
+    expect(extractLexicalText(plainTextToLexical("hello world"))).toBe(
+      "hello world",
+    );
+  });
+
+  it("keeps multi-line text across paragraphs", () => {
+    expect(extractLexicalText(plainTextToLexical("line one\nline two"))).toBe(
+      "line one\nline two",
+    );
+  });
+
+  it("is parseable JSON with a root node", () => {
+    const parsed = JSON.parse(plainTextToLexical("x")) as {
+      root: { type: string; children: unknown[] };
+    };
+    expect(parsed.root.type).toBe("root");
+    expect(parsed.root.children).toHaveLength(1);
   });
 });

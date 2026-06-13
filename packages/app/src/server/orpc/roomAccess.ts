@@ -5,13 +5,15 @@ import { assertSessionAccess } from "./game/access";
 import { assertCardAccess, assertTeamMember } from "./teamAccess";
 
 /** A chat room is identified by the entity it belongs to. `global` is the
- *  single app-wide room; `team`/`card`/`game` point at a team/card/game-session
- *  by id. Add a variant (e.g. `dm`) here + a branch in the two switches below. */
+ *  single app-wide room; `team`/`card`/`game`/`support` point at a
+ *  team/card/game-session/support-ticket by id. Add a variant (e.g. `dm`) here
+ *  + a branch in the two switches below. */
 export const roomRefSchema = z.discriminatedUnion("scope", [
   z.object({ scope: z.literal("global") }),
   z.object({ scope: z.literal("team"), teamId: z.uuid() }),
   z.object({ scope: z.literal("card"), cardId: z.uuid() }),
   z.object({ scope: z.literal("game"), sessionId: z.uuid() }),
+  z.object({ scope: z.literal("support"), ticketId: z.uuid() }),
 ]);
 export type RoomRef = z.infer<typeof roomRefSchema>;
 
@@ -31,7 +33,21 @@ function refToKindOwner(ref: RoomRef): { kind: string; ownerId: string | null } 
       return { kind: "card", ownerId: ref.cardId };
     case "game":
       return { kind: "game", ownerId: ref.sessionId };
+    case "support":
+      return { kind: "support", ownerId: ref.ticketId };
   }
+}
+
+/** A support ticket's team — the access gate for its room (agents = team
+ *  members). Throws NOT_FOUND when the ticket is gone. */
+async function teamIdOfTicket(ticketId: string): Promise<string> {
+  const row = await db
+    .selectFrom("support_tickets")
+    .where("id", "=", ticketId)
+    .select("team_id")
+    .executeTakeFirst();
+  if (!row) throw new ORPCError("NOT_FOUND", { message: "Ticket not found" });
+  return row.team_id;
 }
 
 /** Assert the caller may use the room a ref points at — checked BEFORE the
@@ -48,6 +64,8 @@ export async function assertRefAccess(userId: string, ref: RoomRef) {
     case "game":
       await assertSessionAccess(userId, ref.sessionId);
       return;
+    case "support":
+      return assertTeamMember(userId, await teamIdOfTicket(ref.ticketId));
   }
 }
 
@@ -130,6 +148,9 @@ export async function assertRoomAccess(
       break;
     case "game":
       await assertSessionAccess(userId, room.owner_id!);
+      break;
+    case "support":
+      await assertTeamMember(userId, await teamIdOfTicket(room.owner_id!));
       break;
     default:
       throw new ORPCError("FORBIDDEN", { message: "Unknown room kind" });

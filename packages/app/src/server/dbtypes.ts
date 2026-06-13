@@ -170,6 +170,30 @@ export interface Sessions {
   user_id: string;
 }
 
+export interface SupportCategories {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  name: string;
+  position: Generated<number>;
+  team_id: string;
+}
+
+export interface SupportTickets {
+  access_token: string;
+  category_id: string | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  last_message_at: Generated<Timestamp>;
+  requester_email: string | null;
+  requester_name: string | null;
+  requester_user_id: string | null;
+  resolved_at: Timestamp | null;
+  status: Generated<string>;
+  subject: string | null;
+  team_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface TeamMembers {
   created_at: Generated<Timestamp>;
   role: Generated<string>;
@@ -182,6 +206,7 @@ export interface Teams {
   created_by: string | null;
   id: Generated<string>;
   name: string;
+  widget_key: string | null;
 }
 
 export interface Users {
@@ -241,6 +266,8 @@ export interface DB {
   game_session_players: GameSessionPlayers;
   game_sessions: GameSessions;
   sessions: Sessions;
+  support_categories: SupportCategories;
+  support_tickets: SupportTickets;
   team_members: TeamMembers;
   teams: Teams;
   users: Users;

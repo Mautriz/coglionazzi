@@ -58,6 +58,9 @@ interface RealtimeEvents {
    *  membership changed (add/remove/leave/delete) so they're notified even
    *  when the event leaves/left them outside the team. */
   team: { teamId: string; affectedUserIds?: string[] };
+  /** A team's support inbox changed (ticket created, status/category changed, or
+   *  a new message) — subscribers refetch `support.tickets.list`. */
+  support: { teamId: string };
 }
 
 /** Chat fan-out is keyed by `roomId` (NOT a single shared channel) so a
@@ -89,6 +92,11 @@ export function publishTeamChanged(teamId: string, affectedUserIds?: string[]) {
 /** Stream a chat change to the room's subscribers (only). */
 export function publishChat(roomId: string, event: ChatEvent) {
   chatPublisher.publish(roomId, event);
+}
+
+/** Announce a team's support inbox changed (ticket list refetch). */
+export function publishSupportChanged(teamId: string) {
+  publisher.publish("support", { teamId });
 }
 
 /** Resolve a column's board and announce the board changed. */

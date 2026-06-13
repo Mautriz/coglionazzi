@@ -13,6 +13,7 @@ import { gameRouter } from "./game";
 import { globalPresenceRouter } from "./globalPresence";
 import { presenceRouter } from "./presence";
 import { searchRouter } from "./search";
+import { supportRouter } from "./support";
 import { teamRouter } from "./teams";
 import { userRouter } from "./users";
 
@@ -90,6 +91,7 @@ export const appRouter = {
   globalPresence: globalPresenceRouter,
   presence: presenceRouter,
   search: searchRouter,
+  support: supportRouter,
   team: teamRouter,
   user: userRouter,
   auth: {

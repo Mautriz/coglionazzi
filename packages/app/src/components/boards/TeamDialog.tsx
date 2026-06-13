@@ -24,6 +24,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { SupportSettings } from "~/components/teams/SupportSettings";
 import { rpc, type Outputs } from "~/lib/rpcClient";
 
 type Team = Outputs["team"]["list"][number];
@@ -201,6 +202,8 @@ export function TeamDialog({
             ))}
           </div>
         </div>
+
+        <SupportSettings teamId={team.id} isOwner={isOwner} />
 
         <div className="mt-2 border-t border-border pt-3">
           {isOwner ? (

@@ -11,12 +11,18 @@ import {
   myTeamIds,
 } from "./teamAccess";
 
-/** Delete the chat rooms a team owns — its public 'team' room and the 'card'
- *  rooms of all its cards (no FK on owner_id, so a teams cascade would orphan
- *  them; their messages/reactions cascade off the rooms). */
+/** Delete the chat rooms a team owns — its public 'team' room, the 'card'
+ *  rooms of all its cards, and the 'support' rooms of all its tickets (no FK on
+ *  owner_id, so a teams cascade would orphan them; their messages/reactions
+ *  cascade off the rooms). */
 async function deleteTeamRooms(teamId: string) {
   const cards = await db
     .selectFrom("cards")
+    .where("team_id", "=", teamId)
+    .select("id")
+    .execute();
+  const tickets = await db
+    .selectFrom("support_tickets")
     .where("team_id", "=", teamId)
     .select("id")
     .execute();
@@ -24,6 +30,10 @@ async function deleteTeamRooms(teamId: string) {
   await deleteRoomsByKindOwner(
     "card",
     cards.map((c) => c.id),
+  );
+  await deleteRoomsByKindOwner(
+    "support",
+    tickets.map((t) => t.id),
   );
 }
 

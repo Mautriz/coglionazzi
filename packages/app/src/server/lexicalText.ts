@@ -33,3 +33,41 @@ export function extractLexicalText(serialized: string | null): string {
 
   return parts.join("").replace(/\n{2,}/g, "\n").trim();
 }
+
+/** Wrap plain text into a minimal serialized Lexical editor state — one
+ *  paragraph per line. The inverse of `extractLexicalText`. Used when a source
+ *  that isn't the rich editor (e.g. the public support widget) produces a
+ *  message that must live in the Lexical-bodied `chat_messages`. */
+export function plainTextToLexical(text: string): string {
+  const lines = text.split("\n");
+  const paragraph = (line: string) => ({
+    type: "paragraph",
+    version: 1,
+    direction: null as null,
+    format: "",
+    indent: 0,
+    children: line
+      ? [
+          {
+            type: "text",
+            version: 1,
+            detail: 0,
+            format: 0,
+            mode: "normal",
+            style: "",
+            text: line,
+          },
+        ]
+      : [],
+  });
+  return JSON.stringify({
+    root: {
+      type: "root",
+      version: 1,
+      direction: null,
+      format: "",
+      indent: 0,
+      children: lines.map(paragraph),
+    },
+  });
+}
