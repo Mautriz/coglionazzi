@@ -1,13 +1,15 @@
 import { call, ORPCError } from "@orpc/server";
 import { describe, expect, it } from "vitest";
+import { db } from "../src/server/db";
 import { boardRouter } from "../src/server/orpc/boards";
 import { commentRouter } from "../src/server/orpc/comments";
-import { lexicalState, signUpTestUser } from "./helpers";
+import { createTestTeam, lexicalState, signUpTestUser } from "./helpers";
 
 async function makeBoardWithCard(context: Awaited<ReturnType<typeof signUpTestUser>>["context"]) {
+  const teamId = await createTestTeam(context);
   const { id: boardId } = await call(
     boardRouter.create,
-    { name: "Test board" },
+    { teamId, name: "Test board" },
     { context },
   );
   const board = await call(boardRouter.get, { boardId }, { context });
@@ -171,23 +173,26 @@ describe("comments", () => {
       );
     }
 
+    // Comments are checked directly in the DB: once the host card is gone,
+    // comment.list would throw (no card to authorize against), so we assert
+    // there are no orphaned rows instead.
+    const orphanCount = async (entityId: string) =>
+      Number(
+        (
+          await db
+            .selectFrom("comments")
+            .where("entity_type", "=", "card")
+            .where("entity_id", "=", entityId)
+            .select((eb) => eb.fn.countAll().as("c"))
+            .executeTakeFirstOrThrow()
+        ).c,
+      );
+
     await call(boardRouter.deleteCard, { cardId }, { context });
-    expect(
-      await call(
-        commentRouter.list,
-        { entityType: "card", entityId: cardId },
-        { context },
-      ),
-    ).toHaveLength(0);
+    expect(await orphanCount(cardId)).toBe(0);
 
     await call(boardRouter.deleteBoard, { boardId }, { context });
-    expect(
-      await call(
-        commentRouter.list,
-        { entityType: "card", entityId: otherCard },
-        { context },
-      ),
-    ).toHaveLength(0);
+    expect(await orphanCount(otherCard)).toBe(0);
   });
 
   it("rejects unauthenticated callers", async () => {

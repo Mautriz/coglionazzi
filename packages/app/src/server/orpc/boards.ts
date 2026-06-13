@@ -5,6 +5,13 @@ import { fileUrl, type FileMetadata } from "../files";
 import { extractLexicalText } from "../lexicalText";
 import { authP } from "./base";
 import type { CommentEntityType } from "./comments";
+import {
+  assertBoardAccess,
+  assertCardAccess,
+  assertColumnAccess,
+  assertTeamMember,
+  myTeamIds,
+} from "./teamAccess";
 
 /** Comments have no FK on entity_id (polymorphic) — entity owners call this
  *  from their delete procedures. */
@@ -20,8 +27,8 @@ async function deleteCommentsOf(
     .execute();
 }
 
-/** Kanban boards. Everything is shared between all logged-in users —
- *  it's a friends-crew app, there are no per-board permissions. */
+/** Kanban boards, scoped to teams: a user only sees/touches boards of teams
+ *  they belong to (membership checks live in `./teamAccess`). */
 
 const DEFAULT_COLUMNS = ["To do", "Doing", "Done"];
 
@@ -49,18 +56,33 @@ async function nextCardPosition(columnId: string): Promise<number> {
 }
 
 export const boardRouter = {
-  list: authP.handler(async () => {
+  /** Boards across the caller's teams (each carries its team_id/name so the
+   *  UI can group them). */
+  list: authP.handler(async (info) => {
+    const teamIds = await myTeamIds(info.context.user.id);
+    if (teamIds.length === 0) return [];
+
     const boards = await db
       .selectFrom("boards")
+      .innerJoin("teams", "teams.id", "boards.team_id")
       .leftJoin("board_columns", "board_columns.board_id", "boards.id")
       .leftJoin("cards", "cards.column_id", "board_columns.id")
+      .where("boards.team_id", "in", teamIds)
       .select(({ fn }) => [
         "boards.id",
         "boards.name",
+        "boards.team_id",
+        "teams.name as teamName",
         "boards.created_at",
         fn.count<number>("cards.id").distinct().as("cardCount"),
       ])
-      .groupBy(["boards.id", "boards.name", "boards.created_at"])
+      .groupBy([
+        "boards.id",
+        "boards.name",
+        "boards.team_id",
+        "teams.name",
+        "boards.created_at",
+      ])
       .orderBy("boards.created_at", "asc")
       .execute();
 
@@ -69,12 +91,19 @@ export const boardRouter = {
   }),
 
   create: authP
-    .input(z.object({ name: z.string().trim().min(1).max(80) }))
+    .input(
+      z.object({
+        teamId: z.uuid(),
+        name: z.string().trim().min(1).max(80),
+      }),
+    )
     .handler(async (info) => {
+      await assertTeamMember(info.context.user.id, info.input.teamId);
       const board = await db
         .insertInto("boards")
         .values({
           name: info.input.name,
+          team_id: info.input.teamId,
           created_by: info.context.user.id,
         })
         .returning("id")
@@ -99,6 +128,7 @@ export const boardRouter = {
   get: authP
     .input(z.object({ boardId: z.uuid() }))
     .handler(async (info) => {
+      await assertBoardAccess(info.context.user.id, info.input.boardId);
       const board = await db
         .selectFrom("boards")
         .where("id", "=", info.input.boardId)
@@ -260,6 +290,7 @@ export const boardRouter = {
       }),
     )
     .handler(async (info) => {
+      await assertBoardAccess(info.context.user.id, info.input.boardId);
       const row = await db
         .selectFrom("board_columns")
         .where("board_id", "=", info.input.boardId)
@@ -285,6 +316,7 @@ export const boardRouter = {
       }),
     )
     .handler(async (info) => {
+      await assertColumnAccess(info.context.user.id, info.input.columnId);
       return db
         .insertInto("cards")
         .values({
@@ -311,6 +343,7 @@ export const boardRouter = {
     )
     .handler(async (info) => {
       const { cardId, assigneeIds, ...patch } = info.input;
+      await assertCardAccess(info.context.user.id, cardId);
 
       if (Object.keys(patch).length > 0) {
         await db
@@ -333,16 +366,25 @@ export const boardRouter = {
           .where("card_id", "=", cardId)
           .execute();
         if (assigneeIds.length > 0) {
-          await db
-            .insertInto("card_assignees")
-            .values(
-              assigneeIds.map((userId) => ({
-                card_id: cardId,
-                user_id: userId,
-              })),
-            )
-            .onConflict((oc) => oc.doNothing())
+          // Only assign people who are members of the card's team.
+          const valid = await db
+            .selectFrom("team_members")
+            .innerJoin("boards", "boards.team_id", "team_members.team_id")
+            .innerJoin("board_columns", "board_columns.board_id", "boards.id")
+            .innerJoin("cards", "cards.column_id", "board_columns.id")
+            .where("cards.id", "=", cardId)
+            .where("team_members.user_id", "in", assigneeIds)
+            .select("team_members.user_id")
             .execute();
+          if (valid.length > 0) {
+            await db
+              .insertInto("card_assignees")
+              .values(
+                valid.map((v) => ({ card_id: cardId, user_id: v.user_id })),
+              )
+              .onConflict((oc) => oc.doNothing())
+              .execute();
+          }
         }
       }
     }),
@@ -362,6 +404,9 @@ export const boardRouter = {
     )
     .handler(async (info) => {
       const { cardId, relatedCardId, kind } = info.input;
+      // Both cards must be reachable by the caller (they share a team).
+      await assertCardAccess(info.context.user.id, cardId);
+      await assertCardAccess(info.context.user.id, relatedCardId);
       if (cardId === relatedCardId) {
         throw new ORPCError("BAD_REQUEST", {
           message: "A card cannot relate to itself.",
@@ -392,6 +437,7 @@ export const boardRouter = {
   removeRelation: authP
     .input(z.object({ cardId: z.uuid(), relatedCardId: z.uuid() }))
     .handler(async (info) => {
+      await assertCardAccess(info.context.user.id, info.input.cardId);
       await clearRelation(info.input.cardId, info.input.relatedCardId);
     }),
 
@@ -406,6 +452,10 @@ export const boardRouter = {
       }),
     )
     .handler(async (info) => {
+      // Source card and destination column must both be in the caller's teams
+      // (and, since boards are team-scoped, implicitly the same team).
+      await assertCardAccess(info.context.user.id, info.input.cardId);
+      await assertColumnAccess(info.context.user.id, info.input.columnId);
       await db
         .updateTable("cards")
         .set({
@@ -421,6 +471,7 @@ export const boardRouter = {
   deleteCard: authP
     .input(z.object({ cardId: z.uuid() }))
     .handler(async (info) => {
+      await assertCardAccess(info.context.user.id, info.input.cardId);
       await deleteCommentsOf("card", [info.input.cardId]);
       await db.deleteFrom("cards").where("id", "=", info.input.cardId).execute();
     }),
@@ -428,6 +479,7 @@ export const boardRouter = {
   deleteBoard: authP
     .input(z.object({ boardId: z.uuid() }))
     .handler(async (info) => {
+      await assertBoardAccess(info.context.user.id, info.input.boardId);
       // Comments have no FK to cards — collect the board's card ids and
       // clean theirs up before the cascade wipes columns/cards/attachments.
       const cards = await db
@@ -451,6 +503,7 @@ export const boardRouter = {
   addAttachment: authP
     .input(z.object({ cardId: z.uuid(), fileId: z.uuid() }))
     .handler(async (info) => {
+      await assertCardAccess(info.context.user.id, info.input.cardId);
       await db
         .insertInto("card_attachments")
         .values({ card_id: info.input.cardId, file_id: info.input.fileId })
@@ -461,6 +514,7 @@ export const boardRouter = {
   removeAttachment: authP
     .input(z.object({ cardId: z.uuid(), fileId: z.uuid() }))
     .handler(async (info) => {
+      await assertCardAccess(info.context.user.id, info.input.cardId);
       await db
         .deleteFrom("card_attachments")
         .where("card_id", "=", info.input.cardId)

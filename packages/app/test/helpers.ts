@@ -1,7 +1,18 @@
+import { call } from "@orpc/server";
 import { auth } from "../src/server/auth";
 import type { ORPCContext } from "../src/server/orpc/base";
+import { teamRouter } from "../src/server/orpc/teams";
 
 let userCounter = 0;
+
+/** Create a team owned by the context's user; returns its id. */
+export async function createTestTeam(
+  context: ORPCContext,
+  name = "Test team",
+): Promise<string> {
+  const { id } = await call(teamRouter.create, { name }, { context });
+  return id;
+}
 
 /** Sign up a fresh user through better-auth's server API (no HTTP) and
  *  return an oRPC context whose `reqHeaders` carry its session cookie —

@@ -5,9 +5,16 @@ import {
   useParams,
   useSearch,
 } from "@tanstack/react-router";
-import { FilterIcon, KanbanIcon, PlusIcon } from "lucide-react";
+import {
+  FilterIcon,
+  KanbanIcon,
+  PlusIcon,
+  Settings2Icon,
+  UsersIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { TagBadge } from "~/components/boards/TagBadge";
+import { TeamDialog } from "~/components/boards/TeamDialog";
 import { AssigneeCombobox } from "~/components/custom/AssigneeCombobox";
 import { DatePicker } from "~/components/custom/DatePicker";
 import { SearchBox } from "~/components/custom/SearchBox";
@@ -16,23 +23,113 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { cn } from "~/lib/classUtils";
 import { isFilterActive, type CardFilters } from "~/lib/cardFilters";
-import { rpc } from "~/lib/rpcClient";
+import { rpc, type Outputs } from "~/lib/rpcClient";
 
-/** Boards-specific left rail, rendered UNDER the global topbar: board list
- *  + creation now, filters next. `data-sidebar="sidebar"` opts into the
- *  brand-tinted chrome the theme defines for sidebars. */
+type Team = Outputs["team"]["list"][number];
+type Board = Outputs["board"]["list"][number];
+
+/** Boards-specific left rail, rendered UNDER the global topbar: search,
+ *  boards grouped by team, and (when a board is open) its filters.
+ *  `data-sidebar="sidebar"` opts into the brand-tinted chrome the theme
+ *  defines for sidebars. */
 export function BoardsSidebar() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   // undefined outside a specific board (e.g. on /home/boards).
   const { boardId } = useParams({ strict: false });
 
+  const { data: teams } = useQuery(rpc.team.list.queryOptions());
   const { data: boards } = useQuery(rpc.board.list.queryOptions());
 
+  const [settingsTeam, setSettingsTeam] = useState<Team | null>(null);
+  const [creatingTeam, setCreatingTeam] = useState(false);
+  const [teamName, setTeamName] = useState("");
+
+  const { mutate: createTeam } = useMutation(
+    rpc.team.create.mutationOptions({
+      onSuccess: () => {
+        setTeamName("");
+        setCreatingTeam(false);
+        queryClient.invalidateQueries({ queryKey: rpc.team.list.key() });
+      },
+    }),
+  );
+
+  return (
+    <aside
+      data-sidebar="sidebar"
+      className="flex w-60 shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-3 text-sidebar-foreground max-md:hidden"
+    >
+      <div className="pb-2">
+        <SearchBox />
+      </div>
+
+      {teams?.map((team) => (
+        <TeamSection
+          key={team.id}
+          team={team}
+          boards={boards?.filter((b) => b.team_id === team.id) ?? []}
+          activeBoardId={boardId}
+          onSettings={() => setSettingsTeam(team)}
+        />
+      ))}
+
+      {creatingTeam ? (
+        <form
+          className="px-1 py-0.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (teamName.trim()) createTeam({ name: teamName });
+          }}
+        >
+          <Input
+            autoFocus
+            value={teamName}
+            onChange={(e) => setTeamName(e.target.value)}
+            onBlur={() => !teamName.trim() && setCreatingTeam(false)}
+            onKeyDown={(e) => e.key === "Escape" && setCreatingTeam(false)}
+            placeholder="Team name + Enter"
+            className="h-7 text-sm"
+          />
+        </form>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setCreatingTeam(true)}
+          className="mt-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        >
+          <PlusIcon className="size-4" />
+          New team
+        </button>
+      )}
+
+      {boardId && <BoardFilters boardId={boardId} />}
+
+      {settingsTeam && (
+        <TeamDialog team={settingsTeam} onClose={() => setSettingsTeam(null)} />
+      )}
+    </aside>
+  );
+}
+
+/** One team: header (name + member count + settings), its boards, and an
+ *  inline "add board" scoped to the team. */
+function TeamSection({
+  team,
+  boards,
+  activeBoardId,
+  onSettings,
+}: {
+  team: Team;
+  boards: Board[];
+  activeBoardId?: string;
+  onSettings: () => void;
+}) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
 
-  const { mutate: createBoard, isPending } = useMutation(
+  const { mutate: createBoard } = useMutation(
     rpc.board.create.mutationOptions({
       onSuccess: (board) => {
         setName("");
@@ -47,26 +144,33 @@ export function BoardsSidebar() {
   );
 
   return (
-    <aside
-      data-sidebar="sidebar"
-      className="flex w-60 shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-3 text-sidebar-foreground max-md:hidden"
-    >
-      <div className="pb-2">
-        <SearchBox />
+    <div className="mt-2 flex flex-col gap-0.5">
+      <div className="group flex items-center gap-1 px-2 pb-0.5">
+        <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground2">
+          {team.name}
+          <span className="inline-flex items-center gap-0.5 normal-case">
+            <UsersIcon className="size-3" />
+            {team.memberCount}
+          </span>
+        </h2>
+        <button
+          type="button"
+          aria-label={`${team.name} settings`}
+          onClick={onSettings}
+          className="invisible ml-auto text-muted-foreground hover:text-foreground group-hover:visible"
+        >
+          <Settings2Icon className="size-3.5" />
+        </button>
       </div>
 
-      <h2 className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground2">
-        Boards
-      </h2>
-
-      {boards?.map((board) => (
+      {boards.map((board) => (
         <Link
           key={board.id}
           to="/home/boards/$boardId"
           params={{ boardId: board.id }}
           className={cn(
             "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            board.id === boardId &&
+            board.id === activeBoardId &&
               "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
           )}
         >
@@ -83,13 +187,12 @@ export function BoardsSidebar() {
           className="px-1 py-0.5"
           onSubmit={(e) => {
             e.preventDefault();
-            if (name.trim()) createBoard({ name });
+            if (name.trim()) createBoard({ teamId: team.id, name });
           }}
         >
           <Input
             autoFocus
             value={name}
-            disabled={isPending}
             onChange={(e) => setName(e.target.value)}
             onBlur={() => !name.trim() && setCreating(false)}
             onKeyDown={(e) => e.key === "Escape" && setCreating(false)}
@@ -101,15 +204,13 @@ export function BoardsSidebar() {
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         >
-          <PlusIcon className="size-4" />
-          New board
+          <PlusIcon className="size-3.5" />
+          Add board
         </button>
       )}
-
-      {boardId && <BoardFilters boardId={boardId} />}
-    </aside>
+    </div>
   );
 }
 
@@ -215,6 +316,7 @@ function BoardFilters({ boardId }: { boardId: string }) {
         <AssigneeCombobox
           selected={search.assignees ?? []}
           onChange={(ids) => patch({ assignees: ids })}
+          teamId={board?.team_id}
           placeholder="Filter by assignee…"
         />
       </div>

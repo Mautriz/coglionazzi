@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { extractLexicalText } from "../lexicalText";
 import { authP } from "./base";
+import { assertCardAccess } from "./teamAccess";
 
 /** Every commentable entity kind. Extend this enum (and clean up comments in
  *  the entity's delete procedure) when something new becomes commentable. */
@@ -14,8 +15,25 @@ const entityRef = z.object({
   entityId: z.uuid(),
 });
 
+/** Gate access to a comment thread by its host entity. Each commentable kind
+ *  maps to its owner's access check — add a branch when extending the enum. */
+async function assertEntityAccess(
+  userId: string,
+  entityType: CommentEntityType,
+  entityId: string,
+) {
+  if (entityType === "card") {
+    await assertCardAccess(userId, entityId);
+  }
+}
+
 export const commentRouter = {
   list: authP.input(entityRef).handler(async (info) => {
+    await assertEntityAccess(
+      info.context.user.id,
+      info.input.entityType,
+      info.input.entityId,
+    );
     return db
       .selectFrom("comments")
       .leftJoin("users", "users.id", "comments.created_by")
@@ -44,6 +62,11 @@ export const commentRouter = {
       }),
     )
     .handler(async (info) => {
+      await assertEntityAccess(
+        info.context.user.id,
+        info.input.entityType,
+        info.input.entityId,
+      );
       return db
         .insertInto("comments")
         .values({

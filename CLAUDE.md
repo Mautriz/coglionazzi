@@ -161,14 +161,40 @@ Run from repo root:
   gitignored) and are served by `GET /api/files?fileId=…` with long cache.
   The `files` table records path + metadata (`{name,type,size}`) + uploader.
 
+### Teams (permissions)
+
+- `teams` + `team_members(team_id, user_id, role)` (role `owner | member`).
+  Boards belong to a team (`boards.team_id`, NOT NULL); a user sees/touches
+  a board only if they're a member of its team. Users join many teams. This
+  is a custom model (mirrors propanalyst's `group_members`), NOT
+  better-auth's organization plugin.
+- Access control lives in `src/server/orpc/teamAccess.ts`: `assertTeamMember`
+  / `assertTeamOwner`, `assert{Board,Column,Card}Access` (resolve the entity
+  up to its team, then check membership — throw FORBIDDEN/NOT_FOUND), and
+  `myTeamIds`. EVERY board/card/column/comment/relation/attachment procedure
+  is gated; `board.list` and `search.global` are scoped to `myTeamIds`.
+  When extending board/card features, add the matching access assertion.
+- `rpc.team.*` (`src/server/orpc/teams.ts`): list (my teams, with
+  member/board counts + `isOwner`), create (creator = owner), get/members
+  (member-only), addMember (any member), removeMember (owner), leave
+  (members; owner can't — must delete), rename/delete (owner). `delete`
+  cleans up the cards' polymorphic comments first (no FK).
+- UI: the boards sidebar (`BoardsSidebar`) groups boards under their team
+  with per-team "Add board" + a "New team" creator; `TeamDialog` manages
+  members/rename/delete/leave. `board.create` takes a `teamId`.
+  Card assignee pickers + the assignee filter are scoped to the board's
+  team via `<AssigneeCombobox teamId=…>` (uses `rpc.team.members`).
+- Migration `1770000000006_teams` backfilled all pre-teams data into one
+  default "Coglionazzi" team (every existing user a member, all boards
+  assigned).
+
 ### Kanban boards
 
-- Schema: `boards` → `board_columns` (ordered by `position`) → `cards`
-  (`tags text[]`, `description` = serialized Lexical JSON, `description_text`
-  for search, float `position`) + `card_attachments` (card ↔ file),
-  `card_assignees` (card ↔ user, many-to-many), `card_relations` (card ↔
-  card). Everything is shared between all logged-in users — no per-board
-  permissions.
+- Schema: `boards` (`team_id`) → `board_columns` (ordered by `position`) →
+  `cards` (`tags text[]`, `description` = serialized Lexical JSON,
+  `description_text` for search, float `position`) + `card_attachments`
+  (card ↔ file), `card_assignees` (card ↔ user, many-to-many),
+  `card_relations` (card ↔ card). Boards are team-scoped (see Teams above).
 - `card_relations` carries a `kind`: `'related'` is undirected (rows
   normalized `card_id < related_card_id` so one row = both directions);
   `'blocks'` is directed (`card_id` blocks `related_card_id`). The API
@@ -178,11 +204,12 @@ Run from repo root:
   per-card kind from each card's point of view.
 - API: `rpc.board.*` in `src/server/orpc/boards.ts` — list/create/get,
   addColumn, createCard/updateCard/moveCard/deleteCard,
-  add/removeAttachment, add/removeRelation. `updateCard` takes optional
-  `assigneeIds` (replaces the whole set). `rpc.user.list` feeds assignee
-  pickers. `board.get` returns the fully nested board (cards carry
-  `assignees`, `relations`, `commentCount`, `attachments`); the UI
-  invalidates that one query after any mutation.
+  add/removeAttachment, add/removeRelation (all team-gated). `create` takes
+  a `teamId`; `updateCard` takes optional `assigneeIds` (replaces the whole
+  set, validated against the card's team membership). `rpc.team.members`
+  feeds the (team-scoped) assignee pickers. `board.get` returns the fully
+  nested board (cards carry `assignees`, `relations`, `commentCount`,
+  `attachments`); the UI invalidates that one query after any mutation.
 - Ordering uses float positions: the client computes midpoint-of-neighbors
   and sends it to `moveCard` (omitted position = append at end). Drag &
   drop is @dnd-kit (`DndContext` + per-column `SortableContext` +

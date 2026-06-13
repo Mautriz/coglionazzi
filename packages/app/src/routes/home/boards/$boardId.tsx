@@ -260,6 +260,7 @@ function RouteComponent() {
         <CardDialog
           card={openCard}
           boardCards={allCards.map((c) => ({ id: c.id, title: c.title }))}
+          teamId={board.team_id}
           onClose={() => setOpenCardId(null)}
           onChanged={invalidateBoard}
         />

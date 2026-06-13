@@ -19,23 +19,30 @@ import {
 import { cn } from "~/lib/classUtils";
 import { rpc } from "~/lib/rpcClient";
 
-/** Searchable multi-select of crew members (rpc.user.list). Controlled by
- *  the selected user-id array. Used for card assignees and the assignee
- *  filter. Selected users render as removable avatar chips above the
- *  trigger. */
+/** Searchable multi-select of people. Scoped to a team's members when
+ *  `teamId` is given (assignees, filters on a board); falls back to all
+ *  users otherwise. Controlled by the selected user-id array; selected
+ *  users render as removable avatar chips above the trigger. */
 export function AssigneeCombobox({
   selected,
   onChange,
+  teamId,
   placeholder = "Assign people…",
   className,
 }: {
   selected: string[];
   onChange: (ids: string[]) => void;
+  /** Limit options to this team's members. */
+  teamId?: string;
   placeholder?: string;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const { data: users } = useQuery(rpc.user.list.queryOptions());
+  const { data: users } = useQuery(
+    teamId
+      ? rpc.team.members.queryOptions({ input: { teamId } })
+      : rpc.user.list.queryOptions(),
+  );
 
   const byId = new Map(users?.map((u) => [u.id, u]));
   const chosen = selected.map((id) => byId.get(id)).filter(Boolean) as {

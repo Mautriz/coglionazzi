@@ -45,12 +45,15 @@ const RELATION_LABELS: Record<RelationKind, string> = {
 export function CardDialog({
   card,
   boardCards,
+  teamId,
   onClose,
   onChanged,
 }: {
   card: BoardCard;
   /** All cards of the board (for the relation picker). */
   boardCards: { id: string; title: string }[];
+  /** The board's team — scopes the assignee picker to its members. */
+  teamId: string;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -153,6 +156,7 @@ export function CardDialog({
           <AssigneeCombobox
             selected={assigneeIds}
             onChange={setAssigneeIds}
+            teamId={teamId}
           />
         </div>
 

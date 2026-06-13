@@ -2,6 +2,7 @@ import { sql } from "kysely";
 import { z } from "zod";
 import { db } from "../db";
 import { authP } from "./base";
+import { myTeamIds } from "./teamAccess";
 
 /** Global fuzzy search across boards, card titles, card descriptions and
  *  comments. pg_trgm powers it: `ILIKE %q%` catches exact substrings,
@@ -44,10 +45,16 @@ export const searchRouter = {
     .input(z.object({ query: z.string().trim().min(2).max(100) }))
     .handler(async (info) => {
       const q = info.input.query;
+      // Results are scoped to the caller's teams.
+      const teamIds = await myTeamIds(info.context.user.id);
+      if (teamIds.length === 0) {
+        return { boards: [], cards: [], comments: [] };
+      }
 
       const [boards, cards, comments] = await Promise.all([
         db
           .selectFrom("boards")
+          .where("boards.team_id", "in", teamIds)
           .where(matches(q, "boards.name"))
           .select(["id", "name", rank(q, "boards.name").as("rank")])
           .orderBy("rank", "desc")
@@ -58,6 +65,7 @@ export const searchRouter = {
           .selectFrom("cards")
           .innerJoin("board_columns", "board_columns.id", "cards.column_id")
           .innerJoin("boards", "boards.id", "board_columns.board_id")
+          .where("boards.team_id", "in", teamIds)
           .where((eb) =>
             eb.or([
               matches(q, "cards.title"),
@@ -85,6 +93,7 @@ export const searchRouter = {
           .innerJoin("boards", "boards.id", "board_columns.board_id")
           .leftJoin("users", "users.id", "comments.created_by")
           .where("comments.entity_type", "=", "card")
+          .where("boards.team_id", "in", teamIds)
           .where(matches(q, "comments.body_text"))
           .select([
             "comments.id",

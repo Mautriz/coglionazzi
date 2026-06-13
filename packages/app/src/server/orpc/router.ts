@@ -11,6 +11,7 @@ import { authP, getAuthSession, t } from "./base";
 import { boardRouter } from "./boards";
 import { commentRouter } from "./comments";
 import { searchRouter } from "./search";
+import { teamRouter } from "./teams";
 import { userRouter } from "./users";
 
 export const appRouter = {
@@ -85,6 +86,7 @@ export const appRouter = {
   board: boardRouter,
   comment: commentRouter,
   search: searchRouter,
+  team: teamRouter,
   user: userRouter,
   auth: {
     getSession: t.handler(async (info) => {

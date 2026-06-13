@@ -70,7 +70,22 @@ export interface Files {
 export interface Boards {
   id: Generated<string>;
   name: string;
+  team_id: string;
   created_by: string | null;
+  created_at: Generated<Timestamp>;
+}
+
+export interface Teams {
+  id: Generated<string>;
+  name: string;
+  created_by: string | null;
+  created_at: Generated<Timestamp>;
+}
+
+export interface TeamMembers {
+  team_id: string;
+  user_id: string;
+  role: Generated<"owner" | "member">;
   created_at: Generated<Timestamp>;
 }
 
@@ -134,6 +149,8 @@ export interface DB {
   comments: Comments;
   files: Files;
   boards: Boards;
+  teams: Teams;
+  team_members: TeamMembers;
   board_columns: BoardColumns;
   cards: Cards;
   card_attachments: CardAttachments;

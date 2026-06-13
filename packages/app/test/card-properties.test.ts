@@ -1,22 +1,24 @@
 import { call, ORPCError } from "@orpc/server";
 import { describe, expect, it } from "vitest";
 import { boardRouter } from "../src/server/orpc/boards";
+import { teamRouter } from "../src/server/orpc/teams";
 import { userRouter } from "../src/server/orpc/users";
-import { signUpTestUser } from "./helpers";
+import { createTestTeam, signUpTestUser } from "./helpers";
 
 type Ctx = Awaited<ReturnType<typeof signUpTestUser>>["context"];
 
 async function makeBoard(context: Ctx) {
+  const teamId = await createTestTeam(context);
   const { id: boardId } = await call(
     boardRouter.create,
-    { name: "Props board" },
+    { teamId, name: "Props board" },
     { context },
   );
   const board = await call(boardRouter.get, { boardId }, { context });
   const columnId = board.columns[0].id;
   const card = async (title: string) =>
     (await call(boardRouter.createCard, { columnId, title }, { context })).id;
-  return { boardId, columnId, card };
+  return { teamId, boardId, columnId, card };
 }
 
 const getCard = async (context: Ctx, boardId: string, cardId: string) => {
@@ -33,7 +35,11 @@ describe("card assignees", () => {
     await signUpTestUser("Carol");
     const users = await call(userRouter.list, undefined, { context });
 
-    const { boardId, card } = await makeBoard(context);
+    const { teamId, boardId, card } = await makeBoard(context);
+    // Assignees must be team members.
+    for (const u of users) {
+      await call(teamRouter.addMember, { teamId, userId: u.id }, { context });
+    }
     const cardId = await card("Plan party");
 
     await call(

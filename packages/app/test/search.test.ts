@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { boardRouter } from "../src/server/orpc/boards";
 import { commentRouter } from "../src/server/orpc/comments";
 import { searchRouter } from "../src/server/orpc/search";
-import { lexicalState, signUpTestUser } from "./helpers";
+import { createTestTeam, lexicalState, signUpTestUser } from "./helpers";
 import type { ORPCContext } from "../src/server/orpc/base";
 
 describe("search.global", () => {
@@ -12,9 +12,10 @@ describe("search.global", () => {
   beforeEach(async () => {
     ({ context } = await signUpTestUser());
 
+    const teamId = await createTestTeam(context);
     const { id: boardId } = await call(
       boardRouter.create,
-      { name: "Torneo di scacchi" },
+      { teamId, name: "Torneo di scacchi" },
       { context },
     );
     const board = await call(boardRouter.get, { boardId }, { context });
