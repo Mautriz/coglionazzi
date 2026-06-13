@@ -1,0 +1,225 @@
+/* Lexical editor theme classes (see the `theme` object in
+ * components/editor/RichTextEditor.tsx). Everything keys off the app's
+ * design tokens so both themes work. */
+
+.editor-shell {
+  position: relative;
+}
+
+.editor-input {
+  outline: none;
+  min-height: 180px;
+  padding: 0.9rem 1rem;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--color-foreground);
+  caret-color: var(--color-primary);
+}
+
+.editor-placeholder {
+  position: absolute;
+  top: 0.9rem;
+  left: 1rem;
+  pointer-events: none;
+  user-select: none;
+  color: var(--color-input-placeholder);
+  font-size: 0.95rem;
+}
+
+.editor-paragraph {
+  margin: 0 0 0.5rem;
+}
+.editor-paragraph:last-child {
+  margin-bottom: 0;
+}
+
+.editor-h1,
+.editor-h2,
+.editor-h3 {
+  color: var(--color-foreground);
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 1rem 0 0.45rem;
+}
+.editor-h1 {
+  font-size: 1.6rem;
+}
+.editor-h2 {
+  font-size: 1.35rem;
+}
+.editor-h3 {
+  font-size: 1.15rem;
+}
+.editor-h1:first-child,
+.editor-h2:first-child,
+.editor-h3:first-child {
+  margin-top: 0;
+}
+
+.editor-quote {
+  border-left: 2px solid var(--color-primary);
+  color: var(--color-muted-foreground);
+  margin: 0.6rem 0;
+  padding-left: 0.9rem;
+}
+
+.editor-text-bold {
+  font-weight: 700;
+}
+.editor-text-italic {
+  font-style: italic;
+}
+.editor-text-underline {
+  text-decoration: underline;
+}
+.editor-text-strikethrough {
+  text-decoration: line-through;
+}
+.editor-text-underline-strikethrough {
+  text-decoration: underline line-through;
+}
+.editor-text-code {
+  background: var(--color-card-background);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  padding: 0.12rem 0.35rem;
+}
+
+.editor-link {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+
+.editor-ul,
+.editor-ol {
+  margin: 0.4rem 0;
+  padding-left: 1.5rem;
+}
+.editor-ul {
+  list-style: disc;
+}
+.editor-ol {
+  list-style: decimal;
+}
+.editor-li {
+  list-style: inherit;
+  margin: 0.15rem 0;
+}
+.editor-nested-li {
+  list-style: none;
+}
+
+/* Checklist (from the lexical playground, re-tokened). */
+.editor-li-checked,
+.editor-li-unchecked {
+  position: relative;
+  margin-left: 0.4rem;
+  padding-left: 1.55rem;
+  list-style: none;
+  outline: none;
+}
+.editor-li-checked {
+  text-decoration: line-through;
+  color: var(--color-muted-foreground);
+}
+.editor-li-checked:before,
+.editor-li-unchecked:before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.3em;
+  width: 1em;
+  height: 1em;
+  cursor: pointer;
+  border-radius: calc(var(--radius) + 1px);
+  border: 1.5px solid var(--color-input-unfocused);
+  background: var(--color-input-background);
+}
+.editor-li-checked:before {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+.editor-li-checked:after {
+  content: "";
+  position: absolute;
+  left: 0.32em;
+  top: 0.42em;
+  width: 0.35em;
+  height: 0.6em;
+  transform: rotate(45deg);
+  border-style: solid;
+  border-color: var(--color-background);
+  border-width: 0 2px 2px 0;
+}
+
+.editor-hr {
+  border: none;
+  border-top: 1px solid var(--color-border1);
+  margin: 1rem 0;
+}
+.editor-hr.selected {
+  outline: 2px solid var(--color-ring);
+  user-select: none;
+}
+
+/* Code blocks — gutter with line numbers, prism token colors below. */
+.editor-code {
+  display: block;
+  position: relative;
+  background: var(--color-card-background);
+  border: 1px solid var(--color-card-border);
+  border-radius: calc(var(--radius) + 0.15rem);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin: 0.6rem 0;
+  padding: 0.7rem 0.85rem 0.7rem 3.2rem;
+  overflow-x: auto;
+  tab-size: 2;
+}
+.editor-code:before {
+  content: attr(data-gutter);
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0.7rem 0.5rem;
+  min-width: 2.2rem;
+  height: 100%;
+  text-align: right;
+  color: var(--color-muted-foreground2);
+  background: var(--color-progress-background);
+  border-right: 1px solid var(--color-card-border);
+  white-space: pre-wrap;
+}
+
+.editor-token-comment {
+  color: var(--color-muted-foreground2);
+  font-style: italic;
+}
+.editor-token-punctuation {
+  color: var(--color-muted-foreground);
+}
+.editor-token-property,
+.editor-token-variable {
+  color: var(--color-link);
+}
+.editor-token-selector,
+.editor-token-string {
+  color: var(--color-green1);
+}
+.editor-token-operator {
+  color: var(--color-orange1);
+}
+.editor-token-attr,
+.editor-token-keyword {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.editor-token-function,
+.editor-token-class {
+  color: var(--color-blue1);
+}

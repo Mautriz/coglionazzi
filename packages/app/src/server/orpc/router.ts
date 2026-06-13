@@ -1,9 +1,74 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { auth } from "../auth";
-import { getAuthSession, t } from "./base";
+import { db } from "../db";
+import { fileService } from "../files";
+import { authP, getAuthSession, t } from "./base";
+
+/** Public URL an uploaded file is served from (routes/api/files.ts). */
+const fileUrl = (path: string) =>
+  `/api/files?fileId=${encodeURIComponent(path)}`;
 
 export const appRouter = {
+  image: {
+    upload: authP
+      .input(
+        z.object({
+          file: z
+            .file()
+            .mime(
+              [
+                "image/gif",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/svg+xml",
+              ],
+              "Unsupported file type",
+            )
+            .max(5 * 1024 * 1024, "File size must be less than 5MB"),
+        }),
+      )
+      .handler(async (info) => {
+        const filePath = await fileService.addFile(info.input.file);
+
+        const { id } = await db
+          .insertInto("images")
+          .values({
+            path: filePath,
+            user_id: info.context.user.id,
+            metadata: JSON.stringify({
+              name: info.input.file.name,
+              type: info.input.file.type,
+              size: info.input.file.size,
+            }),
+          })
+          .returning("id")
+          .executeTakeFirstOrThrow();
+
+        return {
+          id,
+          path: filePath,
+          url: fileUrl(filePath),
+        };
+      }),
+
+    /** The caller's uploaded images, newest first. */
+    mine: authP.handler(async (info) => {
+      const images = await db
+        .selectFrom("images")
+        .where("user_id", "=", info.context.user.id)
+        .select(["id", "path", "metadata", "created_at"])
+        .orderBy("created_at", "desc")
+        .limit(50)
+        .execute();
+
+      return images.map((img) => ({
+        ...img,
+        url: fileUrl(img.path),
+      }));
+    }),
+  },
   auth: {
     getSession: t.handler(async (info) => {
       if (!info.context.reqHeaders) {

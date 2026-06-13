@@ -58,7 +58,17 @@ export interface Verifications {
   updated_at: Timestamp | null;
 }
 
+export interface Images {
+  id: Generated<string>;
+  path: string;
+  /** JSON: { name, type, size } of the original upload. */
+  metadata: unknown;
+  user_id: string;
+  created_at: Generated<Timestamp>;
+}
+
 export interface DB {
+  images: Images;
   users: Users;
   sessions: Sessions;
   accounts: Accounts;

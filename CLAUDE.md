@@ -132,6 +132,27 @@ Run from repo root:
   `packages/app` (components.json is configured; cn lives at
   `~/lib/classUtils`).
 
+### Rich text (Lexical)
+
+- Use `<RichTextEditor />` from `~/components/editor/RichTextEditor` for any
+  formatted-text feature. It's uncontrolled: pass `onChange` to receive the
+  serialized editor-state JSON (persist that string) and `initialState` to
+  restore it. Demo on `/home`.
+- Feature set is local-only (history, headings/quote/code, lists +
+  checklists, links + autolink, markdown shortcuts, alignment/indent, hr).
+  New toolbar actions go in `components/editor/ToolbarPlugin.tsx`; new nodes
+  must be registered in the `nodes` array AND themed (theme object in
+  RichTextEditor + classes in `styles/editor.css`).
+
+### Images / file uploads
+
+- Upload via `rpc.image.upload` (`{ file: File }`, auth required, ≤5MB,
+  image mime types only) → returns `{ id, path, url }`. List the caller's
+  images with `rpc.image.mine`. `<ImageUploads />` is the reference UI.
+- Files live on disk at `IMAGES_PATH` (default `packages/app/data/images`,
+  gitignored) and are served by `GET /api/files?fileId=…` with long cache.
+  The `images` table records path + metadata + uploader.
+
 ### Misc
 
 - Path alias: `~/*` (and `@/*`) → `packages/app/src/*`.

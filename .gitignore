@@ -10,3 +10,4 @@ packages/.env.*
 !packages/.env.example
 .claude/settings.local.json
 src/routeTree.gen.ts
+packages/app/data
