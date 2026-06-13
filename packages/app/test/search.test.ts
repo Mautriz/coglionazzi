@@ -1,9 +1,13 @@
 import { call } from "@orpc/server";
 import { beforeEach, describe, expect, it } from "vitest";
 import { boardRouter } from "../src/server/orpc/boards";
-import { commentRouter } from "../src/server/orpc/comments";
 import { searchRouter } from "../src/server/orpc/search";
-import { createTestTeam, lexicalState, signUpTestUser } from "./helpers";
+import {
+  createTestTeam,
+  lexicalState,
+  sendCardMessage,
+  signUpTestUser,
+} from "./helpers";
 import type { ORPCContext } from "../src/server/orpc/base";
 
 describe("search.global", () => {
@@ -35,14 +39,10 @@ describe("search.global", () => {
       },
       { context },
     );
-    await call(
-      commentRouter.add,
-      {
-        entityType: "card",
-        entityId: cardId,
-        body: lexicalState("io porto la pizza margherita per tutti"),
-      },
-      { context },
+    await sendCardMessage(
+      context,
+      cardId,
+      "io porto la pizza margherita per tutti",
     );
   });
 

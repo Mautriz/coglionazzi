@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Link,
+  useMatchRoute,
   useNavigate,
   useParams,
   useSearch,
@@ -8,6 +9,7 @@ import {
 import {
   ArchiveIcon,
   KanbanIcon,
+  MessagesSquareIcon,
   PlusIcon,
   Settings2Icon,
   UsersIcon,
@@ -31,9 +33,15 @@ type Board = Outputs["board"]["list"][number];
  *  defines for sidebars. */
 export function BoardsSidebar() {
   const queryClient = useQueryClient();
-  // undefined outside a specific board (e.g. on /home/boards). On the archive
-  // route the param is `teamId` instead.
-  const { boardId, teamId: archiveTeamId } = useParams({ strict: false });
+  // undefined outside a specific board (e.g. on /home/boards).
+  const { boardId } = useParams({ strict: false });
+  // The archive and team-chat routes BOTH take a `teamId` param — match on the
+  // route to know which (if either) is active, for the sidebar highlight.
+  const matchRoute = useMatchRoute();
+  const archiveMatch = matchRoute({ to: "/home/boards/archive/$teamId" });
+  const chatMatch = matchRoute({ to: "/home/boards/chat/$teamId" });
+  const activeArchiveTeamId = archiveMatch ? archiveMatch.teamId : undefined;
+  const activeChatTeamId = chatMatch ? chatMatch.teamId : undefined;
 
   // Live: refetch teams/boards when a teammate adds/removes a board, changes
   // membership, or renames/deletes a team.
@@ -71,7 +79,8 @@ export function BoardsSidebar() {
           team={team}
           boards={boards?.filter((b) => b.team_id === team.id) ?? []}
           activeBoardId={boardId}
-          activeArchiveTeamId={archiveTeamId}
+          activeArchiveTeamId={activeArchiveTeamId}
+          activeChatTeamId={activeChatTeamId}
           onSettings={() => setSettingsTeam(team)}
         />
       ))}
@@ -121,12 +130,14 @@ function TeamSection({
   boards,
   activeBoardId,
   activeArchiveTeamId,
+  activeChatTeamId,
   onSettings,
 }: {
   team: Team;
   boards: Board[];
   activeBoardId?: string;
   activeArchiveTeamId?: string;
+  activeChatTeamId?: string;
   onSettings: () => void;
 }) {
   const navigate = useNavigate();
@@ -215,6 +226,19 @@ function TeamSection({
           Add board
         </button>
       )}
+
+      <Link
+        to="/home/boards/chat/$teamId"
+        params={{ teamId: team.id }}
+        className={cn(
+          "flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          team.id === activeChatTeamId &&
+            "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+        )}
+      >
+        <MessagesSquareIcon className="size-3.5" />
+        Chat
+      </Link>
 
       <Link
         to="/home/boards/archive/$teamId"

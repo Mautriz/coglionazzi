@@ -42,7 +42,30 @@ export function getRealtimeSocket(): ReconnectingWebSocket {
  *  Call after login/signup (so the new connection is authenticated) and after
  *  logout (so the server drops the old authenticated connection at once,
  *  rather than waiting for the periodic re-check). The RPCLink keeps the same
- *  object — partysocket swaps the underlying socket beneath it. */
-export function reconnectRealtimeSocket() {
-  socket?.reconnect();
+ *  object — partysocket swaps the underlying socket beneath it.
+ *
+ *  Resolves once the socket has re-opened so callers can defer oRPC calls
+ *  (`router.invalidate()`) until the new connection is live. `reconnect()`
+ *  tears down the old socket synchronously but creates the new one a tick
+ *  later, so for a brief window `readyState` is CLOSING/CLOSED (not
+ *  CONNECTING) — a request issued then makes oRPC throw "WebSocket is not
+ *  open" instead of buffering. Awaiting the re-open closes that gap. */
+export function reconnectRealtimeSocket(): Promise<void> {
+  const ws = socket;
+  if (!ws) return Promise.resolve();
+  return new Promise((resolve) => {
+    let done = false;
+    const settle = () => {
+      if (done) return;
+      done = true;
+      ws.removeEventListener("open", settle);
+      clearTimeout(timer);
+      resolve();
+    };
+    // Fail open: never wedge the auth transition on a flaky upgrade — the
+    // destination route's guards handle a still-unauthenticated socket.
+    const timer = setTimeout(settle, 3000);
+    ws.addEventListener("open", settle);
+    ws.reconnect();
+  });
 }

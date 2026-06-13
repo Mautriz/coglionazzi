@@ -1,6 +1,7 @@
 import { call } from "@orpc/server";
 import { auth } from "../src/server/auth";
 import type { ORPCContext } from "../src/server/orpc/base";
+import { chatRouter } from "../src/server/orpc/chat";
 import { teamRouter } from "../src/server/orpc/teams";
 
 let userCounter = 0;
@@ -39,6 +40,25 @@ export async function signUpTestUser(name = "Tester"): Promise<{
     },
     email,
   };
+}
+
+/** Open a card's chat room (find-or-create) and return `{ roomId, messages }`. */
+export async function openCardRoom(context: ORPCContext, cardId: string) {
+  return call(chatRouter.open, { ref: { scope: "card", cardId } }, { context });
+}
+
+/** Post a message to a card's thread; returns the created message. */
+export async function sendCardMessage(
+  context: ORPCContext,
+  cardId: string,
+  text = "hi",
+) {
+  const { roomId } = await openCardRoom(context, cardId);
+  return call(
+    chatRouter.send,
+    { roomId, body: lexicalState(text) },
+    { context },
+  );
 }
 
 /** Minimal serialized Lexical state containing a single paragraph. */

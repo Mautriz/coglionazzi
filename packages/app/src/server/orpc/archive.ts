@@ -4,7 +4,7 @@ import { db } from "../db";
 import { authP } from "./base";
 import {
   attachCardExtras,
-  deleteCommentsOf,
+  deleteCardRooms,
   nextCardPosition,
 } from "./boards";
 import { assertCardAccess, assertTeamMember } from "./teamAccess";
@@ -116,8 +116,8 @@ export const archiveRouter = {
         .execute();
     }),
 
-  /** Permanently delete an archived card (and its polymorphic comments). Only
-   *  archived cards can be purged this way. */
+  /** Permanently delete an archived card (and its chat room → messages +
+   *  reactions). Only archived cards can be purged this way. */
   purge: authP
     .input(z.object({ cardId: z.uuid() }))
     .handler(async (info) => {
@@ -132,7 +132,7 @@ export const archiveRouter = {
           message: "Only archived cards can be permanently deleted.",
         });
       }
-      await deleteCommentsOf("card", [info.input.cardId]);
+      await deleteCardRooms([info.input.cardId]);
       await db
         .deleteFrom("cards")
         .where("id", "=", info.input.cardId)

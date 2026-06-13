@@ -12,7 +12,6 @@ import {
   publisher,
 } from "../realtime/publisher";
 import { authP } from "./base";
-import type { CommentEntityType } from "./comments";
 import {
   assertBoardAccess,
   assertCardAccess,
@@ -21,17 +20,16 @@ import {
   myTeamIds,
 } from "./teamAccess";
 
-/** Comments have no FK on entity_id (polymorphic) — entity owners call this
- *  from their delete procedures. */
-export async function deleteCommentsOf(
-  entityType: CommentEntityType,
-  entityIds: string[],
-) {
-  if (entityIds.length === 0) return;
+/** Permanently delete the chat rooms bound to these cards (cascades their
+ *  messages + reactions). A card's discussion thread is a 'card'-kind room
+ *  with no FK on owner_id, so card owners call this from their delete paths
+ *  (currently archive.purge). */
+export async function deleteCardRooms(cardIds: string[]) {
+  if (cardIds.length === 0) return;
   await db
-    .deleteFrom("comments")
-    .where("entity_type", "=", entityType)
-    .where("entity_id", "in", entityIds)
+    .deleteFrom("chat_rooms")
+    .where("kind", "=", "card")
+    .where("owner_id", "in", cardIds)
     .execute();
 }
 
@@ -142,12 +140,17 @@ export async function attachCardExtras<T extends CardRow>(
             },
       );
 
+  // Card threads are 'card'-kind chat rooms now — count their messages.
   const commentCounts = await db
-    .selectFrom("comments")
-    .where("entity_type", "=", "card")
-    .where("entity_id", "in", cardIds)
-    .select(({ fn }) => ["entity_id", fn.count<number>("id").as("count")])
-    .groupBy("entity_id")
+    .selectFrom("chat_messages")
+    .innerJoin("chat_rooms", "chat_rooms.id", "chat_messages.room_id")
+    .where("chat_rooms.kind", "=", "card")
+    .where("chat_rooms.owner_id", "in", cardIds)
+    .select(({ fn }) => [
+      "chat_rooms.owner_id as entity_id",
+      fn.count<number>("chat_messages.id").as("count"),
+    ])
+    .groupBy("chat_rooms.owner_id")
     .execute();
 
   return cards.map((card) => ({

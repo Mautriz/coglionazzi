@@ -22,6 +22,7 @@ import { Route as HomeBoardsIndexRouteImport } from './routes/home/boards/index'
 import { Route as HomeBoardsBoardIdRouteImport } from './routes/home/boards/$boardId'
 import { Route as ApiRpcSplatRouteImport } from './routes/api/rpc/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as HomeBoardsChatTeamIdRouteImport } from './routes/home/boards/chat.$teamId'
 import { Route as HomeBoardsArchiveTeamIdRouteImport } from './routes/home/boards/archive.$teamId'
 
 const HomeRouteRoute = HomeRouteRouteImport.update({
@@ -89,6 +90,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HomeBoardsChatTeamIdRoute = HomeBoardsChatTeamIdRouteImport.update({
+  id: '/chat/$teamId',
+  path: '/chat/$teamId',
+  getParentRoute: () => HomeBoardsRouteRoute,
+} as any)
 const HomeBoardsArchiveTeamIdRoute = HomeBoardsArchiveTeamIdRouteImport.update({
   id: '/archive/$teamId',
   path: '/archive/$teamId',
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/home/boards/$boardId': typeof HomeBoardsBoardIdRoute
   '/home/boards/': typeof HomeBoardsIndexRoute
   '/home/boards/archive/$teamId': typeof HomeBoardsArchiveTeamIdRoute
+  '/home/boards/chat/$teamId': typeof HomeBoardsChatTeamIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/home/boards/$boardId': typeof HomeBoardsBoardIdRoute
   '/home/boards': typeof HomeBoardsIndexRoute
   '/home/boards/archive/$teamId': typeof HomeBoardsArchiveTeamIdRoute
+  '/home/boards/chat/$teamId': typeof HomeBoardsChatTeamIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/home/boards/$boardId': typeof HomeBoardsBoardIdRoute
   '/home/boards/': typeof HomeBoardsIndexRoute
   '/home/boards/archive/$teamId': typeof HomeBoardsArchiveTeamIdRoute
+  '/home/boards/chat/$teamId': typeof HomeBoardsChatTeamIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/home/boards/$boardId'
     | '/home/boards/'
     | '/home/boards/archive/$teamId'
+    | '/home/boards/chat/$teamId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
     | '/home/boards/$boardId'
     | '/home/boards'
     | '/home/boards/archive/$teamId'
+    | '/home/boards/chat/$teamId'
   id:
     | '__root__'
     | '/'
@@ -189,6 +200,7 @@ export interface FileRouteTypes {
     | '/home/boards/$boardId'
     | '/home/boards/'
     | '/home/boards/archive/$teamId'
+    | '/home/boards/chat/$teamId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -293,6 +305,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/home/boards/chat/$teamId': {
+      id: '/home/boards/chat/$teamId'
+      path: '/chat/$teamId'
+      fullPath: '/home/boards/chat/$teamId'
+      preLoaderRoute: typeof HomeBoardsChatTeamIdRouteImport
+      parentRoute: typeof HomeBoardsRouteRoute
+    }
     '/home/boards/archive/$teamId': {
       id: '/home/boards/archive/$teamId'
       path: '/archive/$teamId'
@@ -321,12 +340,14 @@ interface HomeBoardsRouteRouteChildren {
   HomeBoardsBoardIdRoute: typeof HomeBoardsBoardIdRoute
   HomeBoardsIndexRoute: typeof HomeBoardsIndexRoute
   HomeBoardsArchiveTeamIdRoute: typeof HomeBoardsArchiveTeamIdRoute
+  HomeBoardsChatTeamIdRoute: typeof HomeBoardsChatTeamIdRoute
 }
 
 const HomeBoardsRouteRouteChildren: HomeBoardsRouteRouteChildren = {
   HomeBoardsBoardIdRoute: HomeBoardsBoardIdRoute,
   HomeBoardsIndexRoute: HomeBoardsIndexRoute,
   HomeBoardsArchiveTeamIdRoute: HomeBoardsArchiveTeamIdRoute,
+  HomeBoardsChatTeamIdRoute: HomeBoardsChatTeamIdRoute,
 }
 
 const HomeBoardsRouteRouteWithChildren = HomeBoardsRouteRoute._addFileChildren(

@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { rpc } from "~/lib/rpcClient";
-import type { CommentEntityType } from "~/server/orpc/comments";
 
 /** Subscribe to a board's realtime change stream and refetch `board.get` (and
  *  the sidebar's `board.list` counts) whenever the server signals a change.
@@ -57,27 +56,5 @@ export function useBoardPresence(boardId: string) {
   );
   return live.data ?? [];
 }
-
-/** Subscribe to a comment thread and refetch `comment.list` on every change. */
-export function useCommentsRealtime(
-  entityType: CommentEntityType,
-  entityId: string,
-) {
-  const queryClient = useQueryClient();
-  const live = useQuery(
-    rpc.comment.subscribe.experimental_liveOptions({
-      input: { entityType, entityId },
-      retry: true,
-    }),
-  );
-
-  const updatedAt = live.dataUpdatedAt;
-  useEffect(() => {
-    if (!updatedAt) return;
-    queryClient.invalidateQueries({
-      queryKey: rpc.comment.list.queryKey({
-        input: { entityType, entityId },
-      }),
-    });
-  }, [updatedAt, entityType, entityId, queryClient]);
-}
+// Card/chat threads stream live via `useChatRoom` (lib/useChatRoom.ts), which
+// drives `chat.subscribe` directly — no refetch-on-signal hook needed here.

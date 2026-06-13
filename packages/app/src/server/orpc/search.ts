@@ -87,25 +87,27 @@ export const searchRouter = {
           .limit(LIMIT_PER_KIND)
           .execute(),
 
+        // Card discussion = 'card'-kind chat rooms; search their messages.
         db
-          .selectFrom("comments")
-          .innerJoin("cards", "cards.id", "comments.entity_id")
+          .selectFrom("chat_messages")
+          .innerJoin("chat_rooms", "chat_rooms.id", "chat_messages.room_id")
+          .innerJoin("cards", "cards.id", "chat_rooms.owner_id")
           .innerJoin("board_columns", "board_columns.id", "cards.column_id")
           .innerJoin("boards", "boards.id", "board_columns.board_id")
-          .leftJoin("users", "users.id", "comments.created_by")
-          .where("comments.entity_type", "=", "card")
+          .leftJoin("users", "users.id", "chat_messages.created_by")
+          .where("chat_rooms.kind", "=", "card")
           .where("boards.team_id", "in", teamIds)
           .where("cards.archived_at", "is", null)
-          .where(matches(q, "comments.body_text"))
+          .where(matches(q, "chat_messages.body_text"))
           .select([
-            "comments.id",
-            "comments.body_text",
+            "chat_messages.id",
+            "chat_messages.body_text",
             "cards.id as cardId",
             "cards.title as cardTitle",
             "boards.id as boardId",
             "boards.name as boardName",
             "users.name as author",
-            rank(q, "comments.body_text").as("rank"),
+            rank(q, "chat_messages.body_text").as("rank"),
           ])
           .orderBy("rank", "desc")
           .limit(LIMIT_PER_KIND)

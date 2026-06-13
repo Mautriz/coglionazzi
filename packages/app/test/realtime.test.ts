@@ -2,11 +2,10 @@ import { call, ORPCError } from "@orpc/server";
 import { describe, expect, it } from "vitest";
 import { db } from "../src/server/db";
 import { boardRouter } from "../src/server/orpc/boards";
-import { commentRouter } from "../src/server/orpc/comments";
 import { presenceRouter } from "../src/server/orpc/presence";
 import { teamRouter } from "../src/server/orpc/teams";
 import type { ORPCContext } from "../src/server/orpc/base";
-import { createTestTeam, lexicalState, signUpTestUser } from "./helpers";
+import { createTestTeam, signUpTestUser } from "./helpers";
 
 async function userIdByEmail(email: string): Promise<string> {
   const row = await db
@@ -109,37 +108,6 @@ describe("board.subscribe", () => {
       { context: outsider },
     );
     await expect(iter.next()).rejects.toBeInstanceOf(ORPCError);
-  });
-});
-
-describe("comment.subscribe", () => {
-  it("yields when a comment is added to the thread", async () => {
-    const { context } = await signUpTestUser();
-    const { columnId } = await makeBoard(context);
-    const { id: cardId } = await call(
-      boardRouter.createCard,
-      { columnId, title: "card" },
-      { context },
-    );
-
-    const ac = new AbortController();
-    const iter = await call(
-      commentRouter.subscribe,
-      { entityType: "card", entityId: cardId },
-      { context, signal: ac.signal },
-    );
-    const pending = nextWithin(iter, 2000);
-    await settle();
-
-    await call(
-      commentRouter.add,
-      { entityType: "card", entityId: cardId, body: lexicalState("hi") },
-      { context },
-    );
-
-    expect(await pending).toEqual({ entityType: "card", entityId: cardId });
-    ac.abort();
-    await iter.return?.(undefined);
   });
 });
 

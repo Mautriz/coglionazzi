@@ -17,7 +17,9 @@ export function UserActions() {
     await authClient.signOut();
     // Re-upgrade the (now cookie-less) socket so the server drops the
     // authenticated connection at once, rather than waiting for the re-check.
-    reconnectRealtimeSocket();
+    // Wait for the re-open before invalidating so oRPC calls don't race the
+    // reconnect gap.
+    await reconnectRealtimeSocket();
     queryClient.removeQueries();
     router.invalidate();
     router.navigate({ to: "/auth/login" });

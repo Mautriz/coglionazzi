@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import { db } from "../src/server/db";
 import { archiveRouter } from "../src/server/orpc/archive";
 import { boardRouter } from "../src/server/orpc/boards";
-import { commentRouter } from "../src/server/orpc/comments";
-import { createTestTeam, lexicalState, signUpTestUser } from "./helpers";
+import {
+  createTestTeam,
+  lexicalState,
+  sendCardMessage,
+  signUpTestUser,
+} from "./helpers";
 
 async function makeBoardWithCard(context: Awaited<ReturnType<typeof signUpTestUser>>["context"]) {
   const teamId = await createTestTeam(context);
@@ -54,33 +58,30 @@ describe("board columns", () => {
     ]);
   });
 
-  it("deletes a column but archives its cards (comments kept)", async () => {
+  it("deletes a column but archives its cards (thread kept)", async () => {
     const { context } = await signUpTestUser();
     const { boardId, columnId, cardId, board } = await makeBoardWithCard(
       context,
     );
     const teamId = board.team_id;
-    await call(
-      commentRouter.add,
-      { entityType: "card", entityId: cardId, body: lexicalState("hi") },
-      { context },
-    );
+    await sendCardMessage(context, cardId, "hi");
 
     await call(boardRouter.deleteColumn, { columnId }, { context });
 
     const after = await call(boardRouter.get, { boardId }, { context });
     expect(after.columns.map((c) => c.name)).toEqual(["Doing", "Done"]);
 
-    // The card lives on in the team archive — and its comments survive.
+    // The card lives on in the team archive — and its thread survives.
     const archived = await call(archiveRouter.list, { teamId }, { context });
     expect(archived.map((c) => c.id)).toContain(cardId);
     expect(archived.find((c) => c.id === cardId)?.commentCount).toBe(1);
     const kept = Number(
       (
         await db
-          .selectFrom("comments")
-          .where("entity_type", "=", "card")
-          .where("entity_id", "=", cardId)
+          .selectFrom("chat_messages")
+          .innerJoin("chat_rooms", "chat_rooms.id", "chat_messages.room_id")
+          .where("chat_rooms.kind", "=", "card")
+          .where("chat_rooms.owner_id", "=", cardId)
           .select((eb) => eb.fn.countAll().as("c"))
           .executeTakeFirstOrThrow()
       ).c,
@@ -178,65 +179,9 @@ describe("boards", () => {
   });
 });
 
-describe("comments", () => {
-  it("adds and lists comments with author names and string bodies", async () => {
-    const { context } = await signUpTestUser("Alice");
-    const { cardId } = await makeBoardWithCard(context);
-
-    await call(
-      commentRouter.add,
-      { entityType: "card", entityId: cardId, body: lexicalState("gg") },
-      { context },
-    );
-
-    const comments = await call(
-      commentRouter.list,
-      { entityType: "card", entityId: cardId },
-      { context },
-    );
-    expect(comments).toHaveLength(1);
-    expect(comments[0].author).toBe("Alice");
-    expect(typeof comments[0].body).toBe("string");
-  });
-
-  it("counts comments on board.get cards", async () => {
-    const { context } = await signUpTestUser();
-    const { boardId, cardId } = await makeBoardWithCard(context);
-    for (const t of ["one", "two"]) {
-      await call(
-        commentRouter.add,
-        { entityType: "card", entityId: cardId, body: lexicalState(t) },
-        { context },
-      );
-    }
-    const board = await call(boardRouter.get, { boardId }, { context });
-    expect(board.columns[0].cards[0].commentCount).toBe(2);
-  });
-
-  it("only the author can delete a comment", async () => {
-    const { context: alice } = await signUpTestUser("Alice");
-    const { context: bob } = await signUpTestUser("Bob");
-    const { cardId } = await makeBoardWithCard(alice);
-
-    const { id: commentId } = await call(
-      commentRouter.add,
-      { entityType: "card", entityId: cardId, body: lexicalState("mine") },
-      { context: alice },
-    );
-
-    await expect(
-      call(commentRouter.delete, { commentId }, { context: bob }),
-    ).rejects.toThrowError(ORPCError);
-
-    await call(commentRouter.delete, { commentId }, { context: alice });
-    const comments = await call(
-      commentRouter.list,
-      { entityType: "card", entityId: cardId },
-      { context: alice },
-    );
-    expect(comments).toHaveLength(0);
-  });
-
+describe("board archive vs threads", () => {
+  // Card-thread feature coverage (send/edit/delete/count) lives in chat.test.ts;
+  // here we only verify board lifecycle keeps a card's thread.
   it("deleteBoard archives its cards into the team archive", async () => {
     const { context } = await signUpTestUser();
     const { boardId, columnId, cardId, board } = await makeBoardWithCard(
@@ -248,18 +193,14 @@ describe("comments", () => {
       { columnId, title: "other" },
       { context },
     );
-    for (const entityId of [cardId, otherCard]) {
-      await call(
-        commentRouter.add,
-        { entityType: "card", entityId, body: lexicalState("hi") },
-        { context },
-      );
+    for (const id of [cardId, otherCard]) {
+      await sendCardMessage(context, id, "hi");
     }
 
     await call(boardRouter.deleteBoard, { boardId }, { context });
 
     // Both cards land in the archive (origin detached, column_id null) and
-    // their comments are preserved.
+    // their threads are preserved.
     const archived = await call(archiveRouter.list, { teamId }, { context });
     expect(archived.map((c) => c.id).sort()).toEqual(
       [cardId, otherCard].sort(),

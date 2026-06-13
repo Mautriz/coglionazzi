@@ -89,14 +89,28 @@ export interface Cards {
   title: string;
 }
 
-export interface Comments {
+export interface ChatMessageReactions {
+  created_at: Generated<Timestamp>;
+  emoji: string;
+  message_id: string;
+  user_id: string;
+}
+
+export interface ChatMessages {
   body: Json;
   body_text: Generated<string>;
   created_at: Generated<Timestamp>;
   created_by: string | null;
-  entity_id: string;
-  entity_type: string;
+  edited_at: Timestamp | null;
   id: Generated<string>;
+  room_id: string;
+}
+
+export interface ChatRooms {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  kind: string;
+  owner_id: string | null;
 }
 
 export interface Files {
@@ -159,7 +173,9 @@ export interface DB {
   card_attachments: CardAttachments;
   card_relations: CardRelations;
   cards: Cards;
-  comments: Comments;
+  chat_message_reactions: ChatMessageReactions;
+  chat_messages: ChatMessages;
+  chat_rooms: ChatRooms;
   files: Files;
   sessions: Sessions;
   team_members: TeamMembers;

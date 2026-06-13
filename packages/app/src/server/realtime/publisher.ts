@@ -8,6 +8,35 @@ export interface PresenceViewer {
   name: string | null;
 }
 
+/** A fully-shaped chat message as the client consumes it (body serialized to a
+ *  string for the editor; reactions aggregated). `reactedByMe` is per-viewer,
+ *  so realtime reaction changes are streamed as raw deltas (see ChatEvent) and
+ *  each client resolves `reactedByMe` itself. */
+export interface ChatMessagePayload {
+  id: string;
+  roomId: string;
+  body: string;
+  author: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  editedAt: string | null;
+  reactions: { emoji: string; count: number; reactedByMe: boolean }[];
+}
+
+/** What `chat.subscribe` streams. Append/patch/remove against the local list;
+ *  reaction deltas carry the actor so each client recomputes `reactedByMe`. */
+export type ChatEvent =
+  | { type: "created"; message: ChatMessagePayload }
+  | { type: "updated"; messageId: string; body: string; editedAt: string }
+  | { type: "deleted"; messageId: string }
+  | {
+      type: "reaction";
+      messageId: string;
+      emoji: string;
+      userId: string;
+      added: boolean;
+    };
+
 /** Realtime channels. Payloads carry the entity id so per-entity subscription
  *  procedures can filter the single shared channel down to their target. */
 interface RealtimeEvents {
@@ -24,6 +53,12 @@ interface RealtimeEvents {
    *  when the event leaves/left them outside the team. */
   team: { teamId: string; affectedUserIds?: string[] };
 }
+
+/** Chat fan-out is keyed by `roomId` (NOT a single shared channel) so a
+ *  message only wakes that room's subscribers. Chat is high-frequency — unlike
+ *  the low-frequency board/comment/team channels above, we don't want every
+ *  connected chat consumer woken for every message in every room. */
+export const chatPublisher = new EventPublisher<Record<string, ChatEvent>>();
 
 /** In-process pub/sub for realtime fan-out. Single app instance (see CLAUDE.md
  *  Realtime): one Node process broadcasts to every connected socket. To scale
@@ -43,6 +78,11 @@ export function publishCommentChanged(entityType: string, entityId: string) {
  *  members whose own membership changed (so removed members are still told). */
 export function publishTeamChanged(teamId: string, affectedUserIds?: string[]) {
   publisher.publish("team", { teamId, affectedUserIds });
+}
+
+/** Stream a chat change to the room's subscribers (only). */
+export function publishChat(roomId: string, event: ChatEvent) {
+  chatPublisher.publish(roomId, event);
 }
 
 /** Resolve a column's board and announce the board changed. */

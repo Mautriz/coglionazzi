@@ -78,17 +78,20 @@ packages/
         │   ├── ws/
         │   │   └── rpcHandler.ts  # crossws WS handler: upgrade auth + 5-min re-check
         │   ├── realtime/
-        │   │   ├── publisher.ts   # EventPublisher + publishBoard*/publishComment*
+        │   │   ├── publisher.ts   # shared EventPublisher + chatPublisher (room-keyed)
         │   │   └── presence.ts    # in-memory per-board viewer registry
         │   └── orpc/
         │       ├── base.ts        # ORPCContext (+ connection), `t`, `authP`, resolveSession
+        │       ├── roomAccess.ts  # chat room ref/resolve/access (per-kind)
+        │       ├── chat.ts        # chat.* (rooms + messages + reactions + subscribe)
         │       ├── presence.ts    # presence.subscribe Event Iterator
         │       ├── router.ts      # appRouter — add feature routers here
         │       └── client.ts      # createAppClient → typed client + query utils
         ├── lib/
         │   ├── rpcClient.tsx      # SSR=fetch link, browser=WebSocket link
         │   ├── wsClient.ts        # partysocket ReconnectingWebSocket singleton (browser)
-        │   ├── useRealtime.ts     # useBoardRealtime/useBoardPresence/useCommentsRealtime
+        │   ├── useRealtime.ts     # useBoardRealtime/useBoardPresence/useWorkspaceRealtime
+        │   ├── useChatRoom.ts     # open + live-stream a chat room (messages/reactions)
         │   ├── authClient.tsx     # better-auth react client
         │   ├── theme.ts           # light/dark via class on <html>, localStorage
         │   └── classUtils.tsx     # cn()
@@ -211,10 +214,11 @@ Postgres + a `uploads` volume for assets.
   formatted-text feature. It's uncontrolled: pass `onChange` to receive the
   serialized editor-state JSON (persist that string) and `initialState` to
   restore it. Demo on `/home`.
-- Keyboard submit: pass `onSubmit` to fire on ⌘/Ctrl+Enter; add
-  `submitOnEnter` so a bare Enter submits and Shift+Enter is a newline
-  (the comment composer uses this; the card description uses ⌘/Ctrl+Enter).
-  Implemented by `components/editor/SubmitPlugin.tsx`.
+- Keyboard submit: pass `onSubmit` to fire on ⌘/Ctrl+Enter (Shift/bare Enter
+  = newline). Implemented by `components/editor/SubmitPlugin.tsx`. NEVER use
+  bare Enter to send — `<MessageComposer>` (the one shared composer for
+  comments + chat) is ⌘/Ctrl+Enter only; the `submitOnEnter` prop exists but
+  is unused (kept for flexibility).
 - Feature set is local-only (history, headings/quote/code, lists +
   checklists, links + autolink, markdown shortcuts, alignment/indent, hr).
   New toolbar actions go in `components/editor/ToolbarPlugin.tsx`; new nodes
@@ -250,7 +254,9 @@ Postgres + a `uploads` volume for assets.
   member/board counts + `isOwner`), create (creator = owner), get/members
   (member-only), addMember (any member), removeMember (owner), leave
   (members; owner can't — must delete), rename/delete (owner). `delete`
-  cleans up the cards' polymorphic comments first (no FK).
+  drops the team's chat rooms first (`deleteTeamRooms` — the team room + its
+  cards' rooms; no FK on `owner_id`). Membership/board-set changes publish on
+  the `team` realtime channel (see Realtime).
 - UI: the boards sidebar (`BoardsSidebar`) groups boards under their team
   with per-team "Add board" + a "New team" creator; `TeamDialog` manages
   members/rename/delete/leave. `board.create` takes a `teamId`.
@@ -299,8 +305,9 @@ Postgres + a `uploads` volume for assets.
 - Card editing happens in `~/components/boards/CardDialog` (title, lexical
   description, assignees via `<AssigneeCombobox>`, related-cards manager
   with a kind select, tags via `<TagBadge>` hash-colored chips, attachments
-  via the upload helpers, comment thread at the bottom). `deleteBoard` /
-  `deleteCard` clean up the cards' comments (no FK — see below).
+  via the upload helpers, a `<MessageThread>` card discussion at the bottom —
+  see Chat rooms & messages). Archiving a card KEEPS its room/messages; only
+  `archive.purge` deletes them (`deleteCardRooms`).
 - The boards section has its own left sidebar
   (`~/components/boards/BoardsSidebar`, rendered under the global topbar by
   `routes/home/boards/route.tsx`): the global `<SearchBox>` (boards-only —
@@ -356,16 +363,40 @@ Postgres + a `uploads` volume for assets.
   `<ArchivedCardDialog>`: read-only fields + an active comment thread, footer
   = Restore / Delete forever.
 
-### Comments (polymorphic)
+### Chat rooms & messages (the generic message model)
 
-- `comments(entity_type, entity_id, body jsonb, created_by, …)` attaches a
-  thread to any entity. Commentable kinds live in the `commentEntityType`
-  zod enum (`src/server/orpc/comments.ts`) — extend it AND delete the
-  entity's comments in its delete procedure (no FK on `entity_id`;
-  see `deleteCommentsOf` in the boards router).
-- API: `rpc.comment.list/add/delete` (delete = author-only). UI:
-  `<CommentsSection entityType=… entityId=… />` — Lexical composer +
-  read-only rendering (`<RichTextEditor readOnly>`).
+- ONE message model backs every thread — card discussions AND public chat.
+  A `chat_rooms(kind, owner_id, …)` row is identified by the entity it
+  belongs to: `'global'` (owner_id NULL — the single app-wide room, any
+  logged-in user), `'team'` (owner_id = team.id, members), `'card'` (owner_id
+  = card.id, card access). Add a kind (e.g. `game`, `dm`) + a branch in
+  `roomAccess.ts`. NO FK on `owner_id` and no `team_id` column — access and
+  cleanup are resolved per-kind, mirroring the old polymorphic `comments`
+  (which this REPLACED — there is no comments table anymore).
+- `src/server/orpc/roomAccess.ts`: `roomRefSchema` (the `{scope}` union),
+  `assertRefAccess` (gate BEFORE create), `resolveRoom` (find-or-create —
+  rooms are lazily made on first open), `assertRoomAccess(userId, roomId)`
+  (the read/write gate for every by-roomId procedure). Cleanup is explicit:
+  `deleteCardRooms` (archive.purge) and `deleteTeamRooms` (team.delete) drop
+  rooms whose owner is gone (messages/reactions cascade off the room FK).
+- `chat_messages(room_id, body jsonb, body_text, created_by, edited_at)` +
+  `chat_message_reactions(message_id, user_id, emoji)` (PK all three →
+  one of each emoji per user per message). `created_at` is set with
+  `clock_timestamp()` (not `now()`) so message order = real insertion order
+  even within a transaction. `body_text` is the search companion (see Search).
+- API: `rpc.chat.*` (`src/server/orpc/chat.ts`): `open({ref})` → find-or-create
+  + latest page; `history({roomId, before?, limit})` keyset pages back;
+  `send`/`editMessage`/`deleteMessage` (author-only edit/delete); `react`
+  (toggle); `subscribe({roomId})` Event Iterator. Card `commentCount` on
+  `board.get` counts the card room's messages; `search.global` searches
+  `card`-room messages (was comments).
+- UI: `<MessageThread roomRef={…}>` (`components/custom/`) is the one thread
+  component — used by card dialogs (`{scope:'card', cardId}`) and the Chat
+  section. It composes the shared `<MessageComposer>` (⌘/Ctrl+Enter to send,
+  NEVER bare Enter), `<MessageItem>` (body + reactions + author edit/delete),
+  and `useChatRoom` (`lib/useChatRoom.ts`) which seeds from `chat.open`,
+  streams live (see Realtime), and pages history. The Chat nav section
+  (`routes/home/chat.tsx`) lists Global + each team's room.
 - Gotcha: jsonb columns come back from pg as parsed objects — serialize
   with `JSON.stringify` when returning editor states to the client (the
   editor's `initialState` wants the string).
@@ -376,10 +407,10 @@ Postgres + a `uploads` volume for assets.
   `ILIKE` substring OR `word_similarity >= 0.45`, GIN trigram indexes).
   Lexical jsonb fields are NEVER searched directly — plain text is
   extracted at write time (`extractLexicalText`) into `*_text` companion
-  columns (`cards.description_text`, `comments.body_text`). New rich-text
+  columns (`cards.description_text`, `chat_messages.body_text`). New rich-text
   fields that should be searchable need the same companion column +
   trigram index + write-path extraction.
-- UI: `<SearchBox />` in the /home topbar; card/comment results deep-link
+- UI: `<SearchBox />` in the /home topbar; card/message results deep-link
   via the board route's `?card=` param.
 
 ### Realtime (WebSockets)
@@ -415,16 +446,25 @@ Postgres + a `uploads` volume for assets.
   login/logout. Caveat: WS activity can't slide the session forward (no
   `Set-Cookie`); normal HTTP navigation refreshes it.
 - **Push = Event Iterators + `EventPublisher`** (`server/realtime/`).
-  `publisher` is an in-process pub/sub on four channels (`board`, `comment`,
+  `publisher` is an in-process pub/sub on three SHARED channels (`board`,
   `presence`, `team`); payloads carry the entity id so subscription
   procedures filter the shared channel. Mutations call
-  `publishBoard*`/`publishComment*`/`publishTeamChanged` after writing.
-  **Signal-and-refetch**: `board.subscribe`/`comment.subscribe`/`team.subscribe`
-  yield a contentless change signal; the client (`lib/useRealtime.ts` →
-  `useBoardRealtime`/`useCommentsRealtime`/`useWorkspaceRealtime`) invalidates
-  `board.get` / `comment.list` / (`team.list`+`board.list`) and refetches.
-  Subscriptions are team-gated like everything else; add a `publish*` call
-  when adding a new board/card/team mutation.
+  `publishBoard*`/`publishTeamChanged` after writing.
+  **Signal-and-refetch**: `board.subscribe`/`team.subscribe` yield a
+  contentless change signal; the client (`lib/useRealtime.ts` →
+  `useBoardRealtime`/`useWorkspaceRealtime`) invalidates `board.get` /
+  (`team.list`+`board.list`) and refetches. Subscriptions are team-gated like
+  everything else; add a `publish*` call when adding a new board/card/team
+  mutation.
+- **`chat` = a SEPARATE room-keyed publisher** (`chatPublisher`, keyed by
+  `roomId`, NOT a shared channel). Chat is high-frequency, so a message must
+  only wake its OWN room's subscribers — a shared channel would wake every
+  chat connection per message. `chat.subscribe({roomId})` streams the actual
+  change (created message / edit / delete / reaction delta); the client
+  (`useChatRoom`) applies it to the local list — **stream, not refetch**
+  (reaction deltas carry the actor so each client recomputes `reactedByMe`).
+  `useChatRoom` resubscribes + refetches the latest page on reconnect to fill
+  gaps. Use a room-keyed publisher for any future high-frequency fan-out.
 - **`team` channel = workspace/sidebar liveness** (board added/removed, member
   added/removed, rename, delete). `publishTeamChanged(teamId, affectedUserIds?)`:
   `affectedUserIds` lists members whose OWN membership changed, so a

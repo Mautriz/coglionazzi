@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { TagBadge } from "~/components/boards/TagBadge";
 import { AssigneeCombobox } from "~/components/custom/AssigneeCombobox";
-import { CommentsSection } from "~/components/custom/CommentsSection";
+import { MessageThread } from "~/components/custom/MessageThread";
 import {
   FilePreview,
   UploadButton,
@@ -326,10 +326,11 @@ export function CardDialog({
 
         <div className="flex flex-col gap-1.5">
           <Label>Comments</Label>
-          <CommentsSection
-            entityType="card"
-            entityId={card.id}
-            onCountChanged={onChanged}
+          <MessageThread
+            roomRef={{ scope: "card", cardId: card.id }}
+            onChanged={onChanged}
+            emptyText="No comments yet — start the discussion."
+            composerPlaceholder="Write a comment…"
           />
         </div>
 

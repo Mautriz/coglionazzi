@@ -3,10 +3,13 @@ import { describe, expect, it } from "vitest";
 import { db } from "../src/server/db";
 import { archiveRouter } from "../src/server/orpc/archive";
 import { boardRouter } from "../src/server/orpc/boards";
-import { commentRouter } from "../src/server/orpc/comments";
 import { searchRouter } from "../src/server/orpc/search";
 import type { ORPCContext } from "../src/server/orpc/base";
-import { createTestTeam, lexicalState, signUpTestUser } from "./helpers";
+import {
+  createTestTeam,
+  sendCardMessage,
+  signUpTestUser,
+} from "./helpers";
 
 /** A team with a board, its first column, and a card in it. */
 async function setup(context: ORPCContext) {
@@ -148,14 +151,10 @@ describe("archive", () => {
     ).rejects.toThrowError(ORPCError);
   });
 
-  it("purges an archived card and its comments", async () => {
+  it("purges an archived card and its chat room/messages", async () => {
     const { context } = await signUpTestUser();
     const { teamId, cardId } = await setup(context);
-    await call(
-      commentRouter.add,
-      { entityType: "card", entityId: cardId, body: lexicalState("bye") },
-      { context },
-    );
+    await sendCardMessage(context, cardId, "bye");
     await call(boardRouter.archiveCard, { cardId }, { context });
 
     await call(archiveRouter.purge, { cardId }, { context });
@@ -168,13 +167,14 @@ describe("archive", () => {
       .selectAll()
       .execute();
     expect(cards).toHaveLength(0);
-    const comments = await db
-      .selectFrom("comments")
-      .where("entity_type", "=", "card")
-      .where("entity_id", "=", cardId)
+    // The card's room (and its messages, via cascade) is gone.
+    const rooms = await db
+      .selectFrom("chat_rooms")
+      .where("kind", "=", "card")
+      .where("owner_id", "=", cardId)
       .selectAll()
       .execute();
-    expect(comments).toHaveLength(0);
+    expect(rooms).toHaveLength(0);
   });
 
   it("refuses to purge a live (non-archived) card", async () => {

@@ -18,8 +18,10 @@ import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { TabIndentationPlugin } from "@lexical/react/LexicalTabIndentationPlugin";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import type { EditorState, EditorThemeClasses } from "lexical";
+import type { RefObject } from "react";
 import { cn } from "~/lib/classUtils";
 import { CodeHighlightPlugin } from "./CodeHighlightPlugin";
+import { EditorControlPlugin, type EditorControl } from "./EditorControlPlugin";
 import { SubmitPlugin } from "./SubmitPlugin";
 import { ToolbarPlugin } from "./ToolbarPlugin";
 
@@ -135,12 +137,15 @@ export function RichTextEditor({
   className,
   namespace = "editor",
   readOnly = false,
+  controlRef,
 }: {
   /** Serialized editor state JSON (from `onChange`). */
   initialState?: string;
   onChange?: (serializedState: string) => void;
   /** Fires on Cmd/Ctrl+Enter (and bare Enter when `submitOnEnter`). */
   onSubmit?: () => void;
+  /** Imperative clear/focus handle (to reset a composer in place). */
+  controlRef?: RefObject<EditorControl | null>;
   /** Submit on a plain Enter (Shift+Enter = newline). For comment-style
    *  composers; leave off for document-style fields. */
   submitOnEnter?: boolean;
@@ -222,6 +227,7 @@ export function RichTextEditor({
       {onSubmit && (
         <SubmitPlugin onSubmit={onSubmit} submitOnEnter={submitOnEnter} />
       )}
+      {controlRef && <EditorControlPlugin controlRef={controlRef} />}
     </LexicalComposer>
   );
 }

@@ -10,24 +10,24 @@ import {
   myTeamIds,
 } from "./teamAccess";
 
-/** Delete the comments belonging to every card in the given boards (comments
- *  are polymorphic, no FK — so a board/team cascade leaves them orphaned). */
-async function deleteCommentsForBoards(boardIds: string[]) {
-  if (boardIds.length === 0) return;
-  const cards = await db
-    .selectFrom("cards")
-    .innerJoin("board_columns", "board_columns.id", "cards.column_id")
-    .where("board_columns.board_id", "in", boardIds)
-    .select("cards.id")
-    .execute();
-  if (cards.length === 0) return;
+/** Delete the chat rooms a team owns — its public 'team' room and the 'card'
+ *  rooms of all its cards (no FK on owner_id, so a teams cascade would orphan
+ *  them; their messages/reactions cascade off the rooms). */
+async function deleteTeamRooms(teamId: string) {
   await db
-    .deleteFrom("comments")
-    .where("entity_type", "=", "card")
-    .where(
-      "entity_id",
-      "in",
-      cards.map((c) => c.id),
+    .deleteFrom("chat_rooms")
+    .where((eb) =>
+      eb.or([
+        eb.and([eb("kind", "=", "team"), eb("owner_id", "=", teamId)]),
+        eb.and([
+          eb("kind", "=", "card"),
+          eb(
+            "owner_id",
+            "in",
+            db.selectFrom("cards").where("team_id", "=", teamId).select("id"),
+          ),
+        ]),
+      ]),
     )
     .execute();
 }
@@ -218,11 +218,6 @@ export const teamRouter = {
     .input(z.object({ teamId: z.uuid() }))
     .handler(async (info) => {
       await assertTeamOwner(info.context.user.id, info.input.teamId);
-      const boards = await db
-        .selectFrom("boards")
-        .where("team_id", "=", info.input.teamId)
-        .select("id")
-        .execute();
       // Capture members before the cascade so every ex-member is notified the
       // team is gone (they won't match by membership anymore).
       const members = await db
@@ -230,7 +225,8 @@ export const teamRouter = {
         .where("team_id", "=", info.input.teamId)
         .select("user_id")
         .execute();
-      await deleteCommentsForBoards(boards.map((b) => b.id));
+      // Chat rooms have no FK on owner_id — drop them before the cards go.
+      await deleteTeamRooms(info.input.teamId);
       await db
         .deleteFrom("teams")
         .where("id", "=", info.input.teamId)

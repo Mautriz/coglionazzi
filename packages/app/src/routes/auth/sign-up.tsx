@@ -36,9 +36,11 @@ function RouteComponent() {
           name: values.name,
         },
         {
-          onSuccess: () => {
-            // Re-upgrade the realtime socket so it carries the new cookie.
-            reconnectRealtimeSocket();
+          onSuccess: async () => {
+            // Re-upgrade the realtime socket so it carries the new cookie, and
+            // wait for it to re-open before issuing oRPC calls (invalidate) —
+            // otherwise they race the reconnect gap and throw.
+            await reconnectRealtimeSocket();
             queryClient.removeQueries();
             router.invalidate();
             router.navigate({ to: "/home" });

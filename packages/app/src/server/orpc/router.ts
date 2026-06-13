@@ -8,7 +8,7 @@ import {
 import { archiveRouter } from "./archive";
 import { authP, resolveSession, t } from "./base";
 import { boardRouter } from "./boards";
-import { commentRouter } from "./comments";
+import { chatRouter } from "./chat";
 import { presenceRouter } from "./presence";
 import { searchRouter } from "./search";
 import { teamRouter } from "./teams";
@@ -85,7 +85,7 @@ export const appRouter = {
   },
   board: boardRouter,
   archive: archiveRouter,
-  comment: commentRouter,
+  chat: chatRouter,
   presence: presenceRouter,
   search: searchRouter,
   team: teamRouter,

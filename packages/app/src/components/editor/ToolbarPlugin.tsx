@@ -24,16 +24,12 @@ import {
   $getSelection,
   $isRangeSelection,
   $isRootOrShadowRoot,
-  CAN_REDO_COMMAND,
-  CAN_UNDO_COMMAND,
   COMMAND_PRIORITY_CRITICAL,
   FORMAT_ELEMENT_COMMAND,
   FORMAT_TEXT_COMMAND,
   INDENT_CONTENT_COMMAND,
   OUTDENT_CONTENT_COMMAND,
-  REDO_COMMAND,
   SELECTION_CHANGE_COMMAND,
-  UNDO_COMMAND,
   type ElementFormatType,
   type TextFormatType,
 } from "lexical";
@@ -49,10 +45,8 @@ import {
   ItalicIcon,
   LinkIcon,
   MinusIcon,
-  Redo2Icon,
   StrikethroughIcon,
   UnderlineIcon,
-  Undo2Icon,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -86,8 +80,6 @@ function Divider() {
 export function ToolbarPlugin() {
   const [editor] = useLexicalComposerContext();
 
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
   const [blockType, setBlockType] = useState<BlockType>("paragraph");
   const [formats, setFormats] = useState<Set<TextFormatType>>(new Set());
   const [isLink, setIsLink] = useState(false);
@@ -161,27 +153,9 @@ export function ToolbarPlugin() {
       },
       COMMAND_PRIORITY_CRITICAL,
     );
-    const unregisterUndo = editor.registerCommand(
-      CAN_UNDO_COMMAND,
-      (payload) => {
-        setCanUndo(payload);
-        return false;
-      },
-      COMMAND_PRIORITY_CRITICAL,
-    );
-    const unregisterRedo = editor.registerCommand(
-      CAN_REDO_COMMAND,
-      (payload) => {
-        setCanRedo(payload);
-        return false;
-      },
-      COMMAND_PRIORITY_CRITICAL,
-    );
     return () => {
       unregisterListener();
       unregisterSelection();
-      unregisterUndo();
-      unregisterRedo();
     };
   }, [editor, refreshToolbar]);
 
@@ -259,29 +233,8 @@ export function ToolbarPlugin() {
 
   return (
     <div className="flex flex-wrap items-center gap-0.5 border-b border-input-border px-2 py-1.5">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Undo"
-        disabled={!canUndo}
-        onClick={() => editor.dispatchCommand(UNDO_COMMAND, undefined)}
-      >
-        <Undo2Icon />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Redo"
-        disabled={!canRedo}
-        onClick={() => editor.dispatchCommand(REDO_COMMAND, undefined)}
-      >
-        <Redo2Icon />
-      </Button>
-
-      <Divider />
-
+      {/* Undo/redo are keyboard-only (⌘/Ctrl+Z, ⌘/Ctrl+Shift+Z or Ctrl+Y) via
+          the HistoryPlugin — no toolbar buttons needed. */}
       <Select
         value={blockType}
         onValueChange={(v) => applyBlockType(v as BlockType)}

@@ -1,11 +1,11 @@
 import { call, ORPCError } from "@orpc/server";
 import { describe, expect, it } from "vitest";
 import { boardRouter } from "../src/server/orpc/boards";
-import { commentRouter } from "../src/server/orpc/comments";
+import { chatRouter } from "../src/server/orpc/chat";
 import { searchRouter } from "../src/server/orpc/search";
 import { teamRouter } from "../src/server/orpc/teams";
 import { userRouter } from "../src/server/orpc/users";
-import { createTestTeam, lexicalState, signUpTestUser } from "./helpers";
+import { createTestTeam, signUpTestUser } from "./helpers";
 
 describe("teams", () => {
   it("creates a team with the creator as owner member", async () => {
@@ -122,7 +122,7 @@ describe("board access control", () => {
     expect(aliceBoards[0].teamName).toBe("Test team");
   });
 
-  it("a non-member can't get, mutate, or comment on a board's cards", async () => {
+  it("a non-member can't get, mutate, or open a card's thread", async () => {
     const { context: alice } = await signUpTestUser("Alice");
     const { context: bob } = await signUpTestUser("Bob");
     const { boardId, columnId } = await boardInTeam(alice);
@@ -146,8 +146,8 @@ describe("board access control", () => {
     ).rejects.toThrowError(ORPCError);
     await expect(
       call(
-        commentRouter.add,
-        { entityType: "card", entityId: cardId, body: lexicalState("hi") },
+        chatRouter.open,
+        { ref: { scope: "card", cardId } },
         { context: bob },
       ),
     ).rejects.toThrowError(ORPCError);
