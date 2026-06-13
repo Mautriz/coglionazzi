@@ -31,9 +31,11 @@ import {
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { CardDialog } from "~/components/boards/CardDialog";
+import { PresenceStack } from "~/components/boards/PresenceStack";
 import { TagBadge } from "~/components/boards/TagBadge";
 import { UserAvatar } from "~/components/custom/UserAvatar";
 import { cardMatchesFilters, isFilterActive } from "~/lib/cardFilters";
+import { useBoardRealtime } from "~/lib/useRealtime";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { rpc, type Outputs } from "~/lib/rpcClient";
@@ -79,6 +81,9 @@ function RouteComponent() {
 
   const boardQuery = rpc.board.get.queryOptions({ input: { boardId } });
   const { data: board } = useSuspenseQuery(boardQuery);
+
+  // Live updates: refetch this board whenever a teammate changes it.
+  useBoardRealtime(boardId);
 
   const invalidateBoard = () => {
     queryClient.invalidateQueries({ queryKey: boardQuery.queryKey });
@@ -285,7 +290,9 @@ function RouteComponent() {
             </span>
           )}
         </div>
-        <Button
+        <div className="flex items-center gap-3">
+          <PresenceStack boardId={boardId} />
+          <Button
           type="button"
           variant="ghost"
           size="sm"
@@ -300,6 +307,7 @@ function RouteComponent() {
           <Trash2Icon />
           Delete board
         </Button>
+        </div>
       </div>
 
       <DndContext

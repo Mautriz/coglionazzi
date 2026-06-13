@@ -13,16 +13,13 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 import { ArchivedCardDialog } from "~/components/boards/ArchivedCardDialog";
+import { CardFiltersPanel } from "~/components/boards/CardFiltersPanel";
 import { TagBadge } from "~/components/boards/TagBadge";
-import { AssigneeCombobox } from "~/components/custom/AssigneeCombobox";
-import { DatePicker } from "~/components/custom/DatePicker";
 import { UserAvatar } from "~/components/custom/UserAvatar";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { cn } from "~/lib/classUtils";
 import {
   cardMatchesFilters,
   isFilterActive,
+  mergeFilters,
   type CardFilters,
 } from "~/lib/cardFilters";
 import { rpc } from "~/lib/rpcClient";
@@ -76,26 +73,13 @@ function RouteComponent() {
 
   const openCard = cards.find((c) => c.id === openCardId) ?? null;
 
-  function patch(p: Partial<CardFilters>) {
+  const patch = (p: Partial<CardFilters>) =>
     navigate({
       to: "/home/boards/archive/$teamId",
       params: { teamId },
-      search: (prev) => {
-        const next = { ...prev, ...p };
-        for (const k of ["q", "tags", "assignees", "from", "to"] as const) {
-          const v = next[k];
-          if (!v || (Array.isArray(v) && v.length === 0)) delete next[k];
-        }
-        return next;
-      },
+      search: (prev) => mergeFilters(prev, p),
       replace: true,
     });
-  }
-
-  const toggle = (list: string[] | undefined, value: string) =>
-    list?.includes(value)
-      ? list.filter((v) => v !== value)
-      : [...(list ?? []), value];
 
   return (
     <main className="flex w-full flex-1 flex-col gap-5 p-4 py-6">
@@ -114,82 +98,14 @@ function RouteComponent() {
         </span>
       </div>
 
-      {/* Filter bar — same filters as a board, laid out horizontally. */}
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-card-border bg-card-background p-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">Text</label>
-          <Input
-            value={filters.q ?? ""}
-            onChange={(e) => patch({ q: e.target.value || undefined })}
-            placeholder="Filter by text…"
-            className="h-8 w-48 text-sm"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">Assignees</label>
-          <div className="w-56">
-            <AssigneeCombobox
-              selected={filters.assignees ?? []}
-              onChange={(ids) => patch({ assignees: ids })}
-              teamId={teamId}
-              placeholder="Filter by assignee…"
-            />
-          </div>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">Created from</label>
-          <DatePicker
-            value={filters.from}
-            onChange={(v) => patch({ from: v })}
-            placeholder="From date"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">Created to</label>
-          <DatePicker
-            value={filters.to}
-            onChange={(v) => patch({ to: v })}
-            placeholder="To date"
-          />
-        </div>
-        {isFilterActive(filters) && (
-          <Button
-            variant="link"
-            size="sm"
-            className="text-link"
-            onClick={() =>
-              patch({
-                q: undefined,
-                tags: undefined,
-                assignees: undefined,
-                from: undefined,
-                to: undefined,
-              })
-            }
-          >
-            clear
-          </Button>
-        )}
-        {allTags.length > 0 && (
-          <div className="flex w-full flex-wrap gap-1">
-            {allTags.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => patch({ tags: toggle(filters.tags, tag) })}
-              >
-                <TagBadge
-                  tag={tag}
-                  className={cn(
-                    "cursor-pointer",
-                    !filters.tags?.includes(tag) && "opacity-50",
-                  )}
-                />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Same filters as a board, laid out horizontally (see CardFiltersPanel). */}
+      <CardFiltersPanel
+        layout="bar"
+        filters={filters}
+        allTags={allTags}
+        teamId={teamId}
+        onPatch={patch}
+      />
 
       {visible.length === 0 ? (
         <p className="mt-8 text-center text-sm text-muted-foreground">

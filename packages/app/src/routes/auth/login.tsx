@@ -7,6 +7,7 @@ import { useAppForm } from "~/components/custom/AppForm";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardTitle } from "~/components/ui/card";
 import { authClient } from "~/lib/authClient";
+import { reconnectRealtimeSocket } from "~/lib/wsClient";
 
 const FormSchema = z.object({
   email: z.email("Enter a valid email"),
@@ -32,6 +33,8 @@ function RouteComponent() {
         },
         {
           onSuccess: () => {
+            // Re-upgrade the realtime socket so it carries the new cookie.
+            reconnectRealtimeSocket();
             queryClient.removeQueries();
             router.invalidate();
             router.navigate({ to: "/home" });

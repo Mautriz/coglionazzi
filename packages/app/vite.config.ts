@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
@@ -16,7 +17,17 @@ export default defineConfig({
       projects: ["./tsconfig.json"],
     }),
     tanstackStart(),
-    nitro(),
+    nitro({
+      features: { websocket: true },
+      handlers: [
+        {
+          route: "/api/rpc-ws",
+          handler: fileURLToPath(
+            new URL("./src/server/ws/rpcHandler.ts", import.meta.url),
+          ),
+        },
+      ],
+    }),
     react(),
     tailwindcss(),
   ],

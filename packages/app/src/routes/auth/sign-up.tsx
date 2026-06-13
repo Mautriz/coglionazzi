@@ -1,11 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { z } from "zod";
 import { LinkWithDescription } from "~/components/custom/linkWithDescription";
 import { useAppForm } from "~/components/custom/AppForm";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardTitle } from "~/components/ui/card";
-import { rpc } from "~/lib/rpcClient";
+import { authClient } from "~/lib/authClient";
+import { reconnectRealtimeSocket } from "~/lib/wsClient";
 
 const FormSchema = z.object({
   name: z.string().min(1, "Pick a name"),
@@ -23,15 +25,31 @@ function RouteComponent() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const { mutate, isPending } = useMutation(
-    rpc.auth.signUp.mutationOptions({
-      onSuccess: () => {
-        queryClient.removeQueries();
-        router.invalidate();
-        router.navigate({ to: "/home" });
-      },
-    }),
-  );
+  // Signup goes over HTTP (better-auth sets the session cookie via Set-Cookie,
+  // which WS frames can't carry). autoSignIn logs the new user straight in.
+  const { mutate, isPending } = useMutation({
+    mutationFn: async (values: FormType) => {
+      return await authClient.signUp.email(
+        {
+          email: values.email,
+          password: values.password,
+          name: values.name,
+        },
+        {
+          onSuccess: () => {
+            // Re-upgrade the realtime socket so it carries the new cookie.
+            reconnectRealtimeSocket();
+            queryClient.removeQueries();
+            router.invalidate();
+            router.navigate({ to: "/home" });
+          },
+          onError(e) {
+            toast("Error", { description: e.error.message });
+          },
+        },
+      );
+    },
+  });
 
   const form = useAppForm({
     validators: {

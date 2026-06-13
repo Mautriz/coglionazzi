@@ -1,6 +1,4 @@
-import { ORPCError } from "@orpc/server";
 import { z } from "zod";
-import { auth } from "../auth";
 import { db } from "../db";
 import {
   fileService,
@@ -8,9 +6,10 @@ import {
   type FileMetadata,
 } from "../files";
 import { archiveRouter } from "./archive";
-import { authP, getAuthSession, t } from "./base";
+import { authP, resolveSession, t } from "./base";
 import { boardRouter } from "./boards";
 import { commentRouter } from "./comments";
+import { presenceRouter } from "./presence";
 import { searchRouter } from "./search";
 import { teamRouter } from "./teams";
 import { userRouter } from "./users";
@@ -87,58 +86,20 @@ export const appRouter = {
   board: boardRouter,
   archive: archiveRouter,
   comment: commentRouter,
+  presence: presenceRouter,
   search: searchRouter,
   team: teamRouter,
   user: userRouter,
   auth: {
+    // Login AND signup run over HTTP via the better-auth client directly
+    // (`authClient.signIn/signUp.email`) because they set the session cookie
+    // with Set-Cookie, which the WebSocket transport can't deliver. This
+    // procedure only reads the current session (used in `__root` beforeLoad).
     getSession: t.handler(async (info) => {
-      if (!info.context.reqHeaders) {
-        return null;
-      }
-
-      const { summary } = await getAuthSession(info.context.reqHeaders);
-      return summary ?? null;
+      const resolved = await resolveSession(info.context);
+      if (!resolved) return null;
+      return { user: resolved.user, session: resolved.session };
     }),
-
-    signUp: t
-      .input(
-        z.object({
-          email: z.email(),
-          password: z.string().min(8),
-          name: z.string().min(1),
-        }),
-      )
-      .handler(async (info) => {
-        await auth.api
-          .signUpEmail({
-            body: {
-              email: info.input.email,
-              name: info.input.name,
-              password: info.input.password,
-            },
-            headers: info.context.request?.headers,
-          })
-          .catch(() => {
-            throw new ORPCError("BAD_REQUEST", {
-              message: "Something went wrong during sign up.",
-            });
-          });
-
-        // Sign the fresh user straight in: replay the credentials and copy
-        // the Set-Cookie headers onto our response.
-        const { headers } = await auth.api.signInEmail({
-          body: {
-            email: info.input.email,
-            password: info.input.password,
-          },
-          returnHeaders: true,
-          headers: info.context.request?.headers,
-        });
-
-        headers.forEach((value, key) => {
-          info.context.resHeaders?.set(key, value);
-        });
-      }),
   },
 };
 

@@ -1,14 +1,19 @@
-import { RPCLink } from "@orpc/client/fetch";
+import { RPCLink as FetchRPCLink } from "@orpc/client/fetch";
+import { RPCLink as WebsocketRPCLink } from "@orpc/client/websocket";
 import {
   createAppClient,
   type AppClient,
+  type AppClientLink,
   type AppRpc,
 } from "../server/orpc/client";
 import { getRequestHeaders } from "@tanstack/react-start/server";
-import { isServer } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
+import { getRealtimeSocket } from "./wsClient";
 
 export type { Outputs } from "../server/orpc/client";
+
+// No browser globals on the server (SSR) — picks the transport below.
+const isServer = typeof window === "undefined";
 
 const getHeaders = createServerFn().handler(async () =>
   Object.fromEntries(getRequestHeaders()),
@@ -21,25 +26,27 @@ const builtUrl = `${import.meta.env.VITE_FRONTEND_URL}/api/rpc`;
 // incoming document request's headers so the backend can resolve the session;
 // otherwise getSession returns null and (with infinite staleTime) the client
 // is locked into a logged-out state after hydration.
-const link = new RPCLink({
-  url: isServer ? builtUrl : `${window.location.origin}/api/rpc`,
-
+const ssrLink = new FetchRPCLink({
+  url: builtUrl,
   async fetch(request, init) {
-    let headers: HeadersInit = request.headers;
-    if (isServer) {
-      const incoming = await getHeaders();
-      const filtered = new Headers(incoming as HeadersInit);
-      filtered.delete("upgrade");
-      filtered.delete("connection");
-      headers = filtered;
-    }
-    return fetch(request, {
-      ...init,
-      headers,
-    });
+    const incoming = await getHeaders();
+    const filtered = new Headers(incoming as HeadersInit);
+    filtered.delete("upgrade");
+    filtered.delete("connection");
+    return fetch(request, { ...init, headers: filtered });
   },
 });
 
-const result = createAppClient(link);
+// In the browser, all calls go over a single persistent WebSocket (auth is
+// resolved once at the upgrade — see ws/rpcHandler.ts). Event Iterator
+// procedures (board/comment/presence subscriptions) stream over the same
+// socket. SSR keeps the HTTP fetch link (no socket on the server).
+function createLink(): AppClientLink {
+  if (isServer) return ssrLink as unknown as AppClientLink;
+  const websocket = getRealtimeSocket() as unknown as WebSocket;
+  return new WebsocketRPCLink({ websocket }) as unknown as AppClientLink;
+}
+
+const result = createAppClient(createLink());
 export const client: AppClient = result.client;
 export const rpc: AppRpc = result.rpc;

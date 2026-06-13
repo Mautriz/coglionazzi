@@ -1,11 +1,13 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { db } from "../db";
+import { publishTeamChanged, publisher } from "../realtime/publisher";
 import { authP } from "./base";
 import {
   assertTeamMember,
   assertTeamOwner,
   isTeamMember,
+  myTeamIds,
 } from "./teamAccess";
 
 /** Delete the comments belonging to every card in the given boards (comments
@@ -31,6 +33,37 @@ async function deleteCommentsForBoards(boardIds: string[]) {
 }
 
 export const teamRouter = {
+  /** Live workspace changes: yields whenever a team the caller belongs to
+   *  changes its membership or board set (board added/removed, member
+   *  added/removed, rename, delete). The client refetches `team.list` +
+   *  `board.list`.
+   *
+   *  Performance: membership is resolved ONCE into a local set and events are
+   *  filtered in-process (O(1) per event) — NOT a DB query per event. The DB
+   *  is re-hit ONLY when THIS user's own membership changes (the rare,
+   *  directly-affected case, signalled by `affectedUserIds`); the high-volume
+   *  board-add/remove/rename traffic and every irrelevant event are filtered
+   *  with a `Set.has`, and non-members never touch the DB at all. So the work
+   *  per event is bounded by the genuinely-affected users, not the connection
+   *  count. */
+  subscribe: authP.handler(async function* (
+    info,
+  ): AsyncGenerator<{ teamId: string }> {
+    const me = info.context.user.id;
+    let mine = new Set(await myTeamIds(me));
+    for await (const event of publisher.subscribe("team", {
+      signal: info.signal,
+    })) {
+      if (event.affectedUserIds?.includes(me)) {
+        // My own membership changed — refresh the set, then notify.
+        mine = new Set(await myTeamIds(me));
+        yield { teamId: event.teamId };
+      } else if (mine.has(event.teamId)) {
+        yield { teamId: event.teamId };
+      }
+    }
+  }),
+
   /** Teams the caller belongs to, with board + member counts. */
   list: authP.handler(async (info) => {
     const teams = await db
@@ -87,6 +120,7 @@ export const teamRouter = {
         })
         .execute();
 
+      publishTeamChanged(team.id, [info.context.user.id]);
       return team;
     }),
 
@@ -118,6 +152,7 @@ export const teamRouter = {
         })
         .onConflict((oc) => oc.doNothing())
         .execute();
+      publishTeamChanged(info.input.teamId, [info.input.userId]);
     }),
 
   /** Owner removes someone else (not themselves — owner uses delete). */
@@ -135,6 +170,7 @@ export const teamRouter = {
         .where("team_id", "=", info.input.teamId)
         .where("user_id", "=", info.input.userId)
         .execute();
+      publishTeamChanged(info.input.teamId, [info.input.userId]);
     }),
 
   /** Leave a team. The owner can't leave (must delete the team). */
@@ -159,6 +195,7 @@ export const teamRouter = {
         .where("team_id", "=", info.input.teamId)
         .where("user_id", "=", info.context.user.id)
         .execute();
+      publishTeamChanged(info.input.teamId, [info.context.user.id]);
     }),
 
   rename: authP
@@ -172,6 +209,7 @@ export const teamRouter = {
         .set({ name: info.input.name })
         .where("id", "=", info.input.teamId)
         .execute();
+      publishTeamChanged(info.input.teamId);
     }),
 
   /** Owner-only. Cascades boards/columns/cards via FK; cleans up the
@@ -185,10 +223,21 @@ export const teamRouter = {
         .where("team_id", "=", info.input.teamId)
         .select("id")
         .execute();
+      // Capture members before the cascade so every ex-member is notified the
+      // team is gone (they won't match by membership anymore).
+      const members = await db
+        .selectFrom("team_members")
+        .where("team_id", "=", info.input.teamId)
+        .select("user_id")
+        .execute();
       await deleteCommentsForBoards(boards.map((b) => b.id));
       await db
         .deleteFrom("teams")
         .where("id", "=", info.input.teamId)
         .execute();
+      publishTeamChanged(
+        info.input.teamId,
+        members.map((m) => m.user_id),
+      );
     }),
 };

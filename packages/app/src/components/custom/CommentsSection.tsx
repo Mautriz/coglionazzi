@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { RichTextEditor } from "~/components/editor/RichTextEditor";
 import { Button } from "~/components/ui/button";
 import { rpc } from "~/lib/rpcClient";
+import { useCommentsRealtime } from "~/lib/useRealtime";
 
 type EntityType = "card";
 
@@ -20,6 +21,9 @@ export function CommentsSection({
 }) {
   const queryClient = useQueryClient();
   const input = { entityType, entityId };
+
+  // Live thread: refetch when anyone adds/removes a comment here.
+  useCommentsRealtime(entityType, entityId);
 
   const { data: comments } = useQuery(
     rpc.comment.list.queryOptions({ input }),

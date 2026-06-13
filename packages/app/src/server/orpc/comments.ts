@@ -2,8 +2,23 @@ import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { db } from "../db";
 import { extractLexicalText } from "../lexicalText";
+import {
+  publishBoardOfCard,
+  publishCommentChanged,
+  publisher,
+} from "../realtime/publisher";
 import { authP } from "./base";
 import { assertCardAccess } from "./teamAccess";
+
+/** A comment thread changed: refresh the thread, and (for card threads) the
+ *  board too, so the card's comment-count badge stays live. */
+async function announceCommentChange(
+  entityType: CommentEntityType,
+  entityId: string,
+) {
+  publishCommentChanged(entityType, entityId);
+  if (entityType === "card") await publishBoardOfCard(entityId);
+}
 
 /** Every commentable entity kind. Extend this enum (and clean up comments in
  *  the entity's delete procedure) when something new becomes commentable. */
@@ -28,6 +43,30 @@ async function assertEntityAccess(
 }
 
 export const commentRouter = {
+  /** Live comment thread: yields whenever this entity's comments change. The
+   *  client refetches `comment.list` on each event (signal-and-refetch). */
+  subscribe: authP
+    .input(entityRef)
+    .handler(async function* (
+      info,
+    ): AsyncGenerator<{ entityType: string; entityId: string }> {
+      await assertEntityAccess(
+        info.context.user.id,
+        info.input.entityType,
+        info.input.entityId,
+      );
+      for await (const event of publisher.subscribe("comment", {
+        signal: info.signal,
+      })) {
+        if (
+          event.entityType === info.input.entityType &&
+          event.entityId === info.input.entityId
+        ) {
+          yield { entityType: event.entityType, entityId: event.entityId };
+        }
+      }
+    }),
+
   list: authP.input(entityRef).handler(async (info) => {
     await assertEntityAccess(
       info.context.user.id,
@@ -67,7 +106,7 @@ export const commentRouter = {
         info.input.entityType,
         info.input.entityId,
       );
-      return db
+      const created = await db
         .insertInto("comments")
         .values({
           entity_type: info.input.entityType,
@@ -78,22 +117,32 @@ export const commentRouter = {
         })
         .returning("id")
         .executeTakeFirstOrThrow();
+      await announceCommentChange(info.input.entityType, info.input.entityId);
+      return created;
     }),
 
   /** Authors can delete their own comments. */
   delete: authP
     .input(z.object({ commentId: z.uuid() }))
     .handler(async (info) => {
-      const result = await db
+      // Return the host thread (for the change announcement) while enforcing
+      // author-only deletion.
+      const deleted = await db
         .deleteFrom("comments")
         .where("id", "=", info.input.commentId)
         .where("created_by", "=", info.context.user.id)
+        .returning(["entity_type", "entity_id"])
         .executeTakeFirst();
 
-      if (result.numDeletedRows === 0n) {
+      if (!deleted) {
         throw new ORPCError("FORBIDDEN", {
           message: "You can only delete your own comments.",
         });
       }
+
+      await announceCommentChange(
+        deleted.entity_type as CommentEntityType,
+        deleted.entity_id,
+      );
     }),
 };

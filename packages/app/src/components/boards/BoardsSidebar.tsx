@@ -7,24 +7,20 @@ import {
 } from "@tanstack/react-router";
 import {
   ArchiveIcon,
-  FilterIcon,
   KanbanIcon,
   PlusIcon,
   Settings2Icon,
   UsersIcon,
 } from "lucide-react";
 import { useState } from "react";
-import { TagBadge } from "~/components/boards/TagBadge";
+import { CardFiltersPanel } from "~/components/boards/CardFiltersPanel";
 import { TeamDialog } from "~/components/boards/TeamDialog";
-import { AssigneeCombobox } from "~/components/custom/AssigneeCombobox";
-import { DatePicker } from "~/components/custom/DatePicker";
 import { SearchBox } from "~/components/custom/SearchBox";
-import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
 import { cn } from "~/lib/classUtils";
-import { isFilterActive, type CardFilters } from "~/lib/cardFilters";
+import { mergeFilters, type CardFilters } from "~/lib/cardFilters";
 import { rpc, type Outputs } from "~/lib/rpcClient";
+import { useWorkspaceRealtime } from "~/lib/useRealtime";
 
 type Team = Outputs["team"]["list"][number];
 type Board = Outputs["board"]["list"][number];
@@ -38,6 +34,10 @@ export function BoardsSidebar() {
   // undefined outside a specific board (e.g. on /home/boards). On the archive
   // route the param is `teamId` instead.
   const { boardId, teamId: archiveTeamId } = useParams({ strict: false });
+
+  // Live: refetch teams/boards when a teammate adds/removes a board, changes
+  // membership, or renames/deletes a team.
+  useWorkspaceRealtime();
 
   const { data: teams } = useQuery(rpc.team.list.queryOptions());
   const { data: boards } = useQuery(rpc.board.list.queryOptions());
@@ -250,113 +250,20 @@ function BoardFilters({ boardId }: { boardId: string }) {
     ),
   ].sort();
 
-  function patch(p: Partial<CardFilters>) {
-    navigate({
-      to: "/home/boards/$boardId",
-      params: { boardId },
-      search: (prev) => {
-        const next = { ...prev, ...p };
-        // Drop empties so the URL stays clean.
-        for (const k of ["q", "tags", "assignees", "from", "to"] as const) {
-          const v = next[k];
-          if (!v || (Array.isArray(v) && v.length === 0)) delete next[k];
-        }
-        return next;
-      },
-      replace: true,
-    });
-  }
-
-  const toggle = (list: string[] | undefined, value: string) =>
-    list?.includes(value)
-      ? list.filter((v) => v !== value)
-      : [...(list ?? []), value];
-
   return (
-    <div className="mt-5 flex flex-col gap-3 border-t border-sidebar-border pt-4">
-      <div className="flex items-center justify-between px-2">
-        <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground2">
-          <FilterIcon className="size-3" />
-          Filters
-        </h2>
-        {isFilterActive(search) && (
-          <Button
-            variant="link"
-            size="xs"
-            className="text-link"
-            onClick={() =>
-              patch({
-                q: undefined,
-                tags: undefined,
-                assignees: undefined,
-                from: undefined,
-                to: undefined,
-              })
-            }
-          >
-            clear
-          </Button>
-        )}
-      </div>
-
-      <Input
-        value={search.q ?? ""}
-        onChange={(e) => patch({ q: e.target.value || undefined })}
-        placeholder="Filter by text…"
-        className="h-7 text-sm"
-      />
-
-      {allTags.length > 0 && (
-        <div className="flex flex-col gap-1.5 px-1">
-          <Label className="text-xs text-muted-foreground">Tags</Label>
-          <div className="flex flex-wrap gap-1">
-            {allTags.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => patch({ tags: toggle(search.tags, tag) })}
-              >
-                <TagBadge
-                  tag={tag}
-                  className={cn(
-                    "cursor-pointer",
-                    !search.tags?.includes(tag) && "opacity-50",
-                  )}
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-1.5 px-1">
-        <Label className="text-xs text-muted-foreground">Assignees</Label>
-        <AssigneeCombobox
-          selected={search.assignees ?? []}
-          onChange={(ids) => patch({ assignees: ids })}
-          teamId={board?.team_id}
-          placeholder="Filter by assignee…"
-        />
-      </div>
-
-      <div className="flex flex-col gap-1.5 px-1">
-        <Label className="text-xs text-muted-foreground">Created</Label>
-        {/* Stacked — two pickers + arrow don't fit the narrow rail. */}
-        <div className="flex flex-col gap-1.5">
-          <DatePicker
-            value={search.from}
-            onChange={(v) => patch({ from: v })}
-            placeholder="From date"
-            className="w-full"
-          />
-          <DatePicker
-            value={search.to}
-            onChange={(v) => patch({ to: v })}
-            placeholder="To date"
-            className="w-full"
-          />
-        </div>
-      </div>
-    </div>
+    <CardFiltersPanel
+      layout="rail"
+      filters={search}
+      allTags={allTags}
+      teamId={board?.team_id}
+      onPatch={(patch) =>
+        navigate({
+          to: "/home/boards/$boardId",
+          params: { boardId },
+          search: (prev) => mergeFilters(prev, patch),
+          replace: true,
+        })
+      }
+    />
   );
 }

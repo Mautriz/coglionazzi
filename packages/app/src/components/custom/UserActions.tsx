@@ -3,6 +3,7 @@ import { useRouter } from "@tanstack/react-router";
 import { MoonIcon, SunIcon } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { authClient } from "~/lib/authClient";
+import { reconnectRealtimeSocket } from "~/lib/wsClient";
 import { toggleTheme, useTheme } from "~/lib/theme";
 import { BrandPicker } from "~/components/custom/BrandPicker";
 
@@ -14,6 +15,9 @@ export function UserActions() {
 
   async function logout() {
     await authClient.signOut();
+    // Re-upgrade the (now cookie-less) socket so the server drops the
+    // authenticated connection at once, rather than waiting for the re-check.
+    reconnectRealtimeSocket();
     queryClient.removeQueries();
     router.invalidate();
     router.navigate({ to: "/auth/login" });

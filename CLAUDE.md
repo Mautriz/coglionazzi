@@ -28,6 +28,7 @@ something written here, fix the stale text rather than leaving both.
 | -------------- | --------------------------------------------------------------- |
 | FE/BE framework| TanStack Start (Vite plugin, file-based routes, SSR)             |
 | API layer      | oRPC (`@orpc/server` + `@orpc/client` + `@orpc/tanstack-query`) |
+| Realtime       | oRPC WebSocket adapter (crossws via Nitro) + `EventPublisher`   |
 | Auth           | better-auth (email/password), mounted at `/api/auth/$`          |
 | Database       | Postgres + Kysely (kysely-ctl migrations, kysely-codegen types) |
 | Queries        | TanStack Query (via oRPC query utils)                           |
@@ -55,6 +56,7 @@ packages/
     ├── Dockerfile                 # turbo-pruned build; entrypoint migrates + serves
     ├── entrypoint.sh              # kysely migrate:latest (retry) → node .output
     ├── vite.config.ts             # envDir ".." → reads packages/.env; port 3300
+    │                              #   nitro({ features.websocket, handlers:[/api/rpc-ws] })
     └── src/
         ├── router.tsx             # QueryClient (toast on errors) + router
         ├── routes/
@@ -73,12 +75,20 @@ packages/
         │   ├── db.ts              # pg Pool + Kysely instance + dialect
         │   ├── dbtypes.ts         # DB types (regenerate: npm run genDbTypes)
         │   ├── auth.ts            # betterAuth() config + snake_case field maps
+        │   ├── ws/
+        │   │   └── rpcHandler.ts  # crossws WS handler: upgrade auth + 5-min re-check
+        │   ├── realtime/
+        │   │   ├── publisher.ts   # EventPublisher + publishBoard*/publishComment*
+        │   │   └── presence.ts    # in-memory per-board viewer registry
         │   └── orpc/
-        │       ├── base.ts        # ORPCContext, `t`, `authP` middleware
+        │       ├── base.ts        # ORPCContext (+ connection), `t`, `authP`, resolveSession
+        │       ├── presence.ts    # presence.subscribe Event Iterator
         │       ├── router.ts      # appRouter — add feature routers here
         │       └── client.ts      # createAppClient → typed client + query utils
         ├── lib/
-        │   ├── rpcClient.tsx      # RPCLink (SSR forwards request headers!)
+        │   ├── rpcClient.tsx      # SSR=fetch link, browser=WebSocket link
+        │   ├── wsClient.ts        # partysocket ReconnectingWebSocket singleton (browser)
+        │   ├── useRealtime.ts     # useBoardRealtime/useBoardPresence/useCommentsRealtime
         │   ├── authClient.tsx     # better-auth react client
         │   ├── theme.ts           # light/dark via class on <html>, localStorage
         │   └── classUtils.tsx     # cn()
@@ -120,6 +130,10 @@ Postgres + a `uploads` volume for assets.
   `docker compose up -d --build` from `deploy/`.
 - Local smoke-test without Traefik: add an override publishing the port
   (`ports: ["8090:3000"]`) and `docker network create dokploy-network`.
+- Realtime (see Conventions → Realtime) needs nothing extra: the WebSocket
+  shares the app's port (`/api/rpc-ws`) and Traefik forwards upgrades by
+  default. Keep it to ONE app replica — the event bus/presence live in
+  process; scaling out requires a LISTEN/NOTIFY backplane first.
 
 ## Conventions
 
@@ -140,11 +154,15 @@ Postgres + a `uploads` volume for assets.
 - Session is resolved ONCE in `__root.tsx` `beforeLoad` (staleTime Infinity)
   and lands in router context: guard routes with `ctx.context.user` in
   `beforeLoad` (see `routes/home/route.tsx`).
-- After login/signup/logout: `queryClient.removeQueries()` +
-  `router.invalidate()` + navigate — otherwise the cached session sticks.
-- Login uses `authClient.signIn.email` directly; signup goes through the
-  oRPC `auth.signUp` procedure (which signs in by copying Set-Cookie onto
-  the response via `resHeaders`).
+- After login/signup/logout: `reconnectRealtimeSocket()` (re-upgrade the WS
+  with the new cookie — see Realtime) + `queryClient.removeQueries()` +
+  `router.invalidate()` + navigate — otherwise the cached session and the
+  old socket's identity stick.
+- BOTH login and signup run over HTTP via the better-auth client directly
+  (`authClient.signIn.email` / `authClient.signUp.email`, autoSignIn on) —
+  they set the session cookie with Set-Cookie, which the WebSocket transport
+  can't deliver, so they must NOT go through oRPC. The oRPC `auth` router is
+  read-only (`getSession`).
 - better-auth maps camelCase fields to snake_case columns in
   `src/server/auth.ts` — new auth-related tables must follow that pattern.
 
@@ -290,10 +308,15 @@ Postgres + a `uploads` volume for assets.
   board is open — the filters. The global topbar/nav (Home/Boards/Demo)
   stays on every page; `UserActions` (theme + logout) is shared.
 - Filtering is client-side over the already-loaded board: pure functions in
-  `~/lib/cardFilters.ts` (`cardMatchesFilters`, `isFilterActive`) over the
-  board route's search params (`q`, `tags`, `assignees`, `from`, `to`) —
-  kept in the URL so filtered views are shareable. Date range compares UTC
-  calendar days (inclusive); the UI uses `<DatePicker>` (popover +
+  `~/lib/cardFilters.ts` (`cardMatchesFilters`, `isFilterActive`,
+  `mergeFilters` = merge a patch + drop emptied keys) over the board route's
+  search params (`q`, `tags`, `assignees`, `from`, `to`) — kept in the URL so
+  filtered views are shareable. The filter UI is ONE shared component,
+  `<CardFiltersPanel layout="rail"|"bar">` (`~/components/boards/`), used by
+  both the board sidebar (`rail` = stacked) and the archive page (`bar` =
+  horizontal); parent owns the search-param state and passes `onPatch`. Date
+  range compares UTC calendar days (inclusive); the UI uses `<DatePicker>`
+  (popover +
   shadcn `Calendar`/react-day-picker). `<AssigneeCombobox>` (popover +
   cmdk `Command`) is the searchable multi-select used for both card
   assignees and the assignee filter. `<UserAvatar>` renders hash-colored
@@ -358,6 +381,71 @@ Postgres + a `uploads` volume for assets.
   trigram index + write-path extraction.
 - UI: `<SearchBox />` in the /home topbar; card/comment results deep-link
   via the board route's `?card=` param.
+
+### Realtime (WebSockets)
+
+- **Transport:** in the browser EVERY oRPC call goes over ONE persistent
+  WebSocket; SSR keeps the HTTP fetch link. `lib/rpcClient.tsx` branches on
+  `typeof window`. The socket is partysocket's `ReconnectingWebSocket`
+  (`lib/wsClient.ts`) — it implements the standard WebSocket interface oRPC's
+  websocket `RPCLink` drives and owns reconnection/backoff/buffering; a drop
+  looks like a normal `close` to oRPC (the ClientPeer is reusable, so
+  TanStack Query `retry` re-issues calls over the new socket).
+  `getRealtimeSocket()` is the singleton; `reconnectRealtimeSocket()` calls
+  partysocket's `.reconnect()` on auth change (login/signup/logout) so the new
+  upgrade re-resolves the cookie — same object the RPCLink holds. A server
+  close with code `4401` (session expired) stops retries and redirects to
+  login.
+- **Server endpoint:** a native Nitro WS handler at `/api/rpc-ws`
+  (`server/ws/rpcHandler.ts`), registered via the `nitro()` plugin's
+  `handlers` + `features.websocket` in `vite.config.ts` (takes precedence
+  over Start's catch-all). It uses oRPC's `@orpc/server/crossws`
+  `experimental_RPCHandler` over the SAME `appRouter`.
+- **Auth is resolved ONCE at the upgrade** (WS frames carry no cookies): the
+  `upgrade` hook reads the better-auth cookie and pins
+  `{ user, session, headers }` onto the connection context. Anonymous
+  upgrades are ALLOWED (no cookie → no pinned user) so the socket still
+  serves public procedures on logged-out pages; `authP` rejects protected
+  calls per-request exactly as on HTTP. `authP`/`resolveSession`
+  (`orpc/base.ts`) accept EITHER that `context.connection` (WS) OR
+  per-request `reqHeaders` (HTTP/SSR). An authenticated connection runs a
+  5-min interval that re-checks the session and closes the socket (code
+  `4401` → client redirects to login) on logout/expiry. Because auth is
+  pinned at upgrade, the client MUST `reconnectRealtimeSocket()` after
+  login/logout. Caveat: WS activity can't slide the session forward (no
+  `Set-Cookie`); normal HTTP navigation refreshes it.
+- **Push = Event Iterators + `EventPublisher`** (`server/realtime/`).
+  `publisher` is an in-process pub/sub on four channels (`board`, `comment`,
+  `presence`, `team`); payloads carry the entity id so subscription
+  procedures filter the shared channel. Mutations call
+  `publishBoard*`/`publishComment*`/`publishTeamChanged` after writing.
+  **Signal-and-refetch**: `board.subscribe`/`comment.subscribe`/`team.subscribe`
+  yield a contentless change signal; the client (`lib/useRealtime.ts` →
+  `useBoardRealtime`/`useCommentsRealtime`/`useWorkspaceRealtime`) invalidates
+  `board.get` / `comment.list` / (`team.list`+`board.list`) and refetches.
+  Subscriptions are team-gated like everything else; add a `publish*` call
+  when adding a new board/card/team mutation.
+- **`team` channel = workspace/sidebar liveness** (board added/removed, member
+  added/removed, rename, delete). `publishTeamChanged(teamId, affectedUserIds?)`:
+  `affectedUserIds` lists members whose OWN membership changed, so a
+  just-removed/deleted member is still notified (they no longer match by
+  membership). `team.subscribe` filters by a per-connection membership `Set`
+  resolved ONCE at subscribe; it only re-hits the DB when THIS user's
+  membership changes (i.e. they're in `affectedUserIds`). So per-event work is
+  bounded by the genuinely-affected users — NOT a `myTeamIds` query per
+  connection per event. Keep that pattern (filter in-process; DB only for the
+  directly-affected) for any new fan-out channel.
+- **Presence** (`server/realtime/presence.ts` + `orpc/presence.ts`):
+  `presence.subscribe` registers the caller as a viewer (deduped by user),
+  yields the current roster immediately then on every join/leave, and
+  deregisters in its `finally` (run when oRPC aborts the generator on socket
+  close). `<PresenceStack>` renders the live avatar stack on the board.
+- **Single instance** (see Deploy): the bus/presence registry live in one
+  Node process. To scale horizontally, back `publisher` with Postgres
+  LISTEN/NOTIFY — only `realtime/publisher.ts` changes. Traefik passes WS
+  upgrades by default.
+- Subscription procedures are generators (`async function*`) and don't run
+  until iterated — drive `.next()` to start them (tests rely on this).
 
 ### Testing (vitest)
 

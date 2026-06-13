@@ -4,6 +4,13 @@ import { z } from "zod";
 import { db } from "../db";
 import { fileUrl, type FileMetadata } from "../files";
 import { extractLexicalText } from "../lexicalText";
+import {
+  publishBoardChanged,
+  publishBoardOfCard,
+  publishBoardOfColumn,
+  publishTeamChanged,
+  publisher,
+} from "../realtime/publisher";
 import { authP } from "./base";
 import type { CommentEntityType } from "./comments";
 import {
@@ -167,6 +174,22 @@ export async function attachCardExtras<T extends CardRow>(
 }
 
 export const boardRouter = {
+  /** Live board changes: an Event Iterator that yields whenever this board's
+   *  columns/cards change (any mutation publishes to the `board` channel).
+   *  The client refetches `board.get` on each event (signal-and-refetch). */
+  subscribe: authP
+    .input(z.object({ boardId: z.uuid() }))
+    .handler(async function* (info): AsyncGenerator<{ boardId: string }> {
+      await assertBoardAccess(info.context.user.id, info.input.boardId);
+      for await (const event of publisher.subscribe("board", {
+        signal: info.signal,
+      })) {
+        if (event.boardId === info.input.boardId) {
+          yield { boardId: event.boardId };
+        }
+      }
+    }),
+
   /** Boards across the caller's teams (each carries its team_id/name so the
    *  UI can group them). */
   list: authP.handler(async (info) => {
@@ -236,6 +259,8 @@ export const boardRouter = {
         )
         .execute();
 
+      // New board shows up in every team member's sidebar.
+      publishTeamChanged(info.input.teamId);
       return board;
     }),
 
@@ -304,7 +329,7 @@ export const boardRouter = {
         .select((eb) => eb.fn.max("position").as("max"))
         .executeTakeFirst();
 
-      return db
+      const created = await db
         .insertInto("board_columns")
         .values({
           board_id: info.input.boardId,
@@ -313,6 +338,8 @@ export const boardRouter = {
         })
         .returning("id")
         .executeTakeFirstOrThrow();
+      publishBoardChanged(info.input.boardId);
+      return created;
     }),
 
   renameColumn: authP
@@ -329,6 +356,7 @@ export const boardRouter = {
         .set({ name: info.input.name })
         .where("id", "=", info.input.columnId)
         .execute();
+      await publishBoardOfColumn(info.input.columnId);
     }),
 
   /** Reorder a column. `position` (float, midpoint-of-neighbors computed
@@ -361,12 +389,20 @@ export const boardRouter = {
         .set({ position })
         .where("id", "=", info.input.columnId)
         .execute();
+      await publishBoardOfColumn(info.input.columnId);
     }),
 
   deleteColumn: authP
     .input(z.object({ columnId: z.uuid() }))
     .handler(async (info) => {
       await assertColumnAccess(info.context.user.id, info.input.columnId);
+      // Resolve the board before the column is gone, so we can announce the
+      // change after the delete.
+      const owning = await db
+        .selectFrom("board_columns")
+        .where("id", "=", info.input.columnId)
+        .select("board_id")
+        .executeTakeFirst();
       // Archive the column's live cards (snapshotting their origin) before the
       // column goes — the FK's ON DELETE SET NULL then detaches them, so they
       // survive in the team archive instead of cascade-deleting.
@@ -392,6 +428,7 @@ export const boardRouter = {
         .deleteFrom("board_columns")
         .where("id", "=", info.input.columnId)
         .execute();
+      if (owning) publishBoardChanged(owning.board_id);
     }),
 
   createCard: authP
@@ -411,7 +448,7 @@ export const boardRouter = {
         .where("board_columns.id", "=", info.input.columnId)
         .select("boards.team_id")
         .executeTakeFirstOrThrow();
-      return db
+      const created = await db
         .insertInto("cards")
         .values({
           column_id: info.input.columnId,
@@ -422,6 +459,8 @@ export const boardRouter = {
         })
         .returning("id")
         .executeTakeFirstOrThrow();
+      await publishBoardOfColumn(info.input.columnId);
+      return created;
     }),
 
   updateCard: authP
@@ -482,6 +521,8 @@ export const boardRouter = {
           }
         }
       }
+
+      await publishBoardOfCard(cardId);
     }),
 
   /** Link two cards. `kind` is from the perspective of `cardId`:
@@ -527,6 +568,9 @@ export const boardRouter = {
         .insertInto("card_relations")
         .values({ card_id: from, related_card_id: to, kind: storedKind })
         .execute();
+      // Both cards' boards reflect the new relation.
+      await publishBoardOfCard(cardId);
+      await publishBoardOfCard(relatedCardId);
     }),
 
   removeRelation: authP
@@ -534,6 +578,8 @@ export const boardRouter = {
     .handler(async (info) => {
       await assertCardAccess(info.context.user.id, info.input.cardId);
       await clearRelation(info.input.cardId, info.input.relatedCardId);
+      await publishBoardOfCard(info.input.cardId);
+      await publishBoardOfCard(info.input.relatedCardId);
     }),
 
   /** Move a card into a column. `position` (float, midpoint-of-neighbors
@@ -551,6 +597,15 @@ export const boardRouter = {
       // (and, since boards are team-scoped, implicitly the same team).
       await assertCardAccess(info.context.user.id, info.input.cardId);
       await assertColumnAccess(info.context.user.id, info.input.columnId);
+      // Capture the source board before the move so we can notify it too (a
+      // move can in principle cross boards within a team; usually it's the
+      // same board and the duplicate event is harmless).
+      const source = await db
+        .selectFrom("cards")
+        .innerJoin("board_columns", "board_columns.id", "cards.column_id")
+        .where("cards.id", "=", info.input.cardId)
+        .select("board_columns.board_id")
+        .executeTakeFirst();
       await db
         .updateTable("cards")
         .set({
@@ -561,6 +616,8 @@ export const boardRouter = {
         })
         .where("id", "=", info.input.cardId)
         .execute();
+      await publishBoardOfColumn(info.input.columnId);
+      if (source) publishBoardChanged(source.board_id);
     }),
 
   /** Soft-delete: send a card to its team's archive. Keeps column_id so it
@@ -589,12 +646,20 @@ export const boardRouter = {
         .where("id", "=", info.input.cardId)
         .where("archived_at", "is", null)
         .execute();
+      // archiveCard keeps column_id, so the board still resolves off the card.
+      await publishBoardOfCard(info.input.cardId);
     }),
 
   deleteBoard: authP
     .input(z.object({ boardId: z.uuid() }))
     .handler(async (info) => {
       await assertBoardAccess(info.context.user.id, info.input.boardId);
+      // Resolve the owning team before the board is gone (for the sidebar).
+      const owner = await db
+        .selectFrom("boards")
+        .where("id", "=", info.input.boardId)
+        .select("team_id")
+        .executeTakeFirst();
       // Archive the board's live cards (origin = "<board> / <column>") before
       // it goes. Deleting the board cascades its columns, whose ON DELETE SET
       // NULL detaches these cards — they live on in the team archive.
@@ -614,6 +679,9 @@ export const boardRouter = {
         .deleteFrom("boards")
         .where("id", "=", info.input.boardId)
         .execute();
+      publishBoardChanged(info.input.boardId);
+      // Drop the board from every team member's sidebar.
+      if (owner) publishTeamChanged(owner.team_id);
     }),
 
   addAttachment: authP
@@ -625,6 +693,7 @@ export const boardRouter = {
         .values({ card_id: info.input.cardId, file_id: info.input.fileId })
         .onConflict((oc) => oc.doNothing())
         .execute();
+      await publishBoardOfCard(info.input.cardId);
     }),
 
   removeAttachment: authP
@@ -636,5 +705,6 @@ export const boardRouter = {
         .where("card_id", "=", info.input.cardId)
         .where("file_id", "=", info.input.fileId)
         .execute();
+      await publishBoardOfCard(info.input.cardId);
     }),
 };

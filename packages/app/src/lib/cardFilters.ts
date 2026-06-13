@@ -23,10 +23,28 @@ type FilterableCard = {
   created_at: Date | string;
 };
 
+/** The filter keys, for iterating/clearing. */
+export const FILTER_KEYS = ["q", "tags", "assignees", "from", "to"] as const;
+
 export function isFilterActive(f: CardFilters): boolean {
   return Boolean(
     f.q?.trim() || f.tags?.length || f.assignees?.length || f.from || f.to,
   );
+}
+
+/** Merge a partial filter patch into the previous search params, dropping
+ *  emptied filter keys so the URL stays clean. Non-filter keys (e.g. `card`)
+ *  are preserved. Used by both the board and archive filter UIs. */
+export function mergeFilters<T extends CardFilters>(
+  prev: T,
+  patch: Partial<CardFilters>,
+): T {
+  const next = { ...prev, ...patch };
+  for (const k of FILTER_KEYS) {
+    const v = next[k];
+    if (!v || (Array.isArray(v) && v.length === 0)) delete next[k];
+  }
+  return next;
 }
 
 export function cardMatchesFilters(
