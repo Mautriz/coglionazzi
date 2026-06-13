@@ -1,20 +1,11 @@
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  createFileRoute,
-  Link,
-  Outlet,
-  redirect,
-  useRouter,
-} from "@tanstack/react-router";
-import { MoonIcon, SunIcon } from "lucide-react";
+import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { Logo } from "~/components/custom/Logo";
 import { SearchBox } from "~/components/custom/SearchBox";
-import { Button } from "~/components/ui/button";
-import { authClient } from "~/lib/authClient";
-import { toggleTheme, useTheme } from "~/lib/theme";
+import { UserActions } from "~/components/custom/UserActions";
 
 /** Protected area: everything under /home requires a session and shares the
- *  top bar + nav. */
+ *  top bar + nav. The boards section adds its own left sidebar below this
+ *  (routes/home/boards/route.tsx). */
 export const Route = createFileRoute("/home")({
   component: RouteComponent,
   beforeLoad(ctx) {
@@ -26,25 +17,14 @@ export const Route = createFileRoute("/home")({
 
 const NAV = [
   { to: "/home", label: "Home", exact: true },
-  { to: "/home/boards", label: "Boards" },
-  { to: "/home/demo", label: "Demo" },
+  { to: "/home/boards", label: "Boards", exact: false },
+  { to: "/home/demo", label: "Demo", exact: false },
 ] as const;
 
 function RouteComponent() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const theme = useTheme();
-
-  async function logout() {
-    await authClient.signOut();
-    queryClient.removeQueries();
-    router.invalidate();
-    router.navigate({ to: "/auth/login" });
-  }
-
   return (
-    <div className="min-h-dvh flex flex-col">
-      <header className="app-topbar flex items-center justify-between gap-4 border-b px-4 py-3">
+    <div className="flex h-dvh flex-col">
+      <header className="app-topbar flex shrink-0 items-center justify-between gap-4 border-b px-4 py-3">
         <div className="flex items-center gap-6">
           <Link to="/home">
             <Logo size="sm" />
@@ -54,7 +34,7 @@ function RouteComponent() {
               <Link
                 key={item.to}
                 to={item.to}
-                activeOptions={{ exact: "exact" in item && item.exact }}
+                activeOptions={{ exact: item.exact }}
                 className="rounded-md px-2.5 py-1 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 activeProps={{
                   className: "bg-sidebar-accent text-sidebar-accent-foreground",
@@ -67,16 +47,13 @@ function RouteComponent() {
         </div>
         <div className="flex flex-1 items-center justify-end gap-2">
           <SearchBox />
-          <Button variant="ghost" size="icon" onClick={toggleTheme}>
-            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-          </Button>
-          <Button variant="outline" size="sm" onClick={logout}>
-            Log out
-          </Button>
+          <UserActions />
         </div>
       </header>
 
-      <Outlet />
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <Outlet />
+      </div>
     </div>
   );
 }

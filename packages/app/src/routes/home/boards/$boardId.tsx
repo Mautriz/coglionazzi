@@ -51,8 +51,11 @@ function RouteComponent() {
   const boardQuery = rpc.board.get.queryOptions({ input: { boardId } });
   const { data: board } = useSuspenseQuery(boardQuery);
 
-  const invalidateBoard = () =>
+  const invalidateBoard = () => {
     queryClient.invalidateQueries({ queryKey: boardQuery.queryKey });
+    // Sidebar card counts come from board.list.
+    queryClient.invalidateQueries({ queryKey: rpc.board.list.key() });
+  };
 
   const { mutate: moveCard } = useMutation(
     rpc.board.moveCard.mutationOptions({ onSettled: invalidateBoard }),
