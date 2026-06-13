@@ -19,7 +19,7 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import {
   GripVerticalIcon,
   LinkIcon,
@@ -52,10 +52,21 @@ export const Route = createFileRoute("/home/boards/$boardId")({
     from: z.string().optional(),
     to: z.string().optional(),
   }),
-  loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(
-      rpc.board.get.queryOptions({ input: { boardId: params.boardId } }),
-    ),
+  loader: async ({ context, params }) => {
+    try {
+      return await context.queryClient.ensureQueryData(
+        rpc.board.get.queryOptions({ input: { boardId: params.boardId } }),
+      );
+    } catch (err) {
+      // Not a member of the board's team (or the board is gone) → send the
+      // user back to the boards list instead of an error page.
+      const code = (err as { code?: string } | null)?.code;
+      if (code === "FORBIDDEN" || code === "NOT_FOUND") {
+        throw redirect({ to: "/home/boards" });
+      }
+      throw err;
+    }
+  },
 });
 
 type Board = Outputs["board"]["get"];
