@@ -17,6 +17,7 @@ export const presenceRouter = {
       const leave = joinPresence(info.input.boardId, {
         userId: info.context.user.id,
         name: info.context.user.name ?? null,
+        image: info.context.user.image ?? null,
       });
       try {
         yield presenceSnapshot(info.input.boardId);

@@ -6,7 +6,7 @@ export const userRouter = {
   list: authP.handler(async () => {
     return db
       .selectFrom("users")
-      .select(["id", "name"])
+      .select(["id", "name", "image"])
       .orderBy("name", "asc")
       .execute();
   }),

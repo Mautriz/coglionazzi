@@ -43,6 +43,7 @@ export function MessageItem({
         <UserAvatar
           id={message.createdBy ?? "ghost"}
           name={message.author ?? "ghost"}
+          image={message.authorImage}
           size="xs"
         />
         <span className="text-xs font-semibold">

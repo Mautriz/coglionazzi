@@ -127,7 +127,7 @@ export function ArchivedCardDialog({
                   key={a.id}
                   className="inline-flex items-center gap-1.5 text-sm"
                 >
-                  <UserAvatar id={a.id} name={a.name} size="xs" />
+                  <UserAvatar id={a.id} name={a.name} image={a.image} size="xs" />
                   {a.name}
                 </span>
               ))}

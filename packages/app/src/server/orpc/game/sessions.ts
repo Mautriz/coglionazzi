@@ -158,9 +158,13 @@ export const sessionRouter = {
                 .selectFrom("game_session_players")
                 .innerJoin("users", "users.id", "game_session_players.user_id")
                 .where("session_id", "=", info.input.sessionId)
-                .select(["game_session_players.user_id as userId", "users.name"])
+                .select([
+                  "game_session_players.user_id as userId",
+                  "users.name",
+                  "users.image",
+                ])
                 .execute()
-            ).map((r) => ({ userId: r.userId, name: r.name }));
+            ).map((r) => ({ userId: r.userId, name: r.name, image: r.image }));
       const amInRoster = players.some((p) => p.userId === uid);
 
       const matchups = await db
@@ -247,6 +251,7 @@ export const sessionRouter = {
       const leave = joinGamePresence(info.input.sessionId, {
         userId: info.context.user.id,
         name: info.context.user.name ?? null,
+        image: info.context.user.image ?? null,
       });
       try {
         yield {

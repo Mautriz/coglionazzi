@@ -156,7 +156,12 @@ export function TeamDialog({
                           }}
                           className="gap-2"
                         >
-                          <UserAvatar id={user.id} name={user.name} size="xs" />
+                          <UserAvatar
+                            id={user.id}
+                            name={user.name}
+                            image={user.image}
+                            size="xs"
+                          />
                           {user.name}
                         </CommandItem>
                       ))}
@@ -173,7 +178,7 @@ export function TeamDialog({
                 key={member.id}
                 className="group flex items-center gap-2 rounded-md px-1 py-1 text-sm"
               >
-                <UserAvatar id={member.id} name={member.name} size="sm" />
+                <UserAvatar id={member.id} name={member.name} image={member.image} size="sm" />
                 <span className="truncate">{member.name}</span>
                 {member.role === "owner" && (
                   <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">

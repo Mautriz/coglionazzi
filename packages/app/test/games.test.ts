@@ -213,7 +213,7 @@ describe("game versus — start + vote", () => {
     // would auto-resolve the matchup) — the matchup stays open to inspect.
     const { email: mateEmail } = await signUpTestUser("Mate");
     const mateId = await userIdOf(mateEmail);
-    joinGamePresence(sessionId, { userId: mateId, name: "Mate" });
+    joinGamePresence(sessionId, { userId: mateId, name: "Mate", image: null });
 
     await call(gameRouter.versus.start, { sessionId, cardCount: 4 }, { context });
 

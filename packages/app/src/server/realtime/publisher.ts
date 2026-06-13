@@ -6,6 +6,7 @@ import { db } from "../db";
 export interface PresenceViewer {
   userId: string;
   name: string | null;
+  image: string | null;
 }
 
 /** A fully-shaped chat message as the client consumes it (body serialized to a
@@ -17,6 +18,7 @@ export interface ChatMessagePayload {
   roomId: string;
   body: string;
   author: string | null;
+  authorImage: string | null;
   createdBy: string | null;
   createdAt: string;
   editedAt: string | null;

@@ -48,6 +48,7 @@ export function AssigneeCombobox({
   const chosen = selected.map((id) => byId.get(id)).filter(Boolean) as {
     id: string;
     name: string;
+    image: string | null;
   }[];
 
   const toggle = (id: string) =>
@@ -66,7 +67,7 @@ export function AssigneeCombobox({
               key={user.id}
               className="flex items-center gap-1.5 rounded-full border border-card-border bg-accent py-0.5 pl-0.5 pr-1.5 text-xs"
             >
-              <UserAvatar id={user.id} name={user.name} size="xs" />
+              <UserAvatar id={user.id} name={user.name} image={user.image} size="xs" />
               {user.name}
               <button
                 type="button"
@@ -112,7 +113,7 @@ export function AssigneeCombobox({
                       onSelect={() => toggle(user.id)}
                       className="gap-2"
                     >
-                      <UserAvatar id={user.id} name={user.name} size="xs" />
+                      <UserAvatar id={user.id} name={user.name} image={user.image} size="xs" />
                       <span className="truncate">{user.name}</span>
                       <CheckIcon
                         className={cn(

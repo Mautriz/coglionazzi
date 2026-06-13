@@ -27,7 +27,7 @@ export function useGameSession(sessionId: string) {
   const sessionQuery = useQuery(getOptions);
 
   const [players, setPlayers] = useState<
-    { userId: string; name: string | null }[] | null
+    { userId: string; name: string | null; image: string | null }[] | null
   >(null);
   const [liveVotes, setLiveVotes] = useState<LiveVotes | null>(null);
   const [reveal, setReveal] = useState<{

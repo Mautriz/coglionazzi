@@ -27,6 +27,7 @@ type MessageRow = {
   created_at: unknown;
   edited_at: unknown;
   author: string | null;
+  author_image: string | null;
 };
 
 /** Attach aggregated reactions to a page of message rows and serialize them
@@ -56,6 +57,7 @@ async function shapeMessages(
     // jsonb comes back parsed; the editor wants the serialized string.
     body: JSON.stringify(r.body),
     author: r.author,
+    authorImage: r.author_image,
     createdBy: r.created_by,
     createdAt: toIso(r.created_at),
     editedAt: r.edited_at ? toIso(r.edited_at) : null,
@@ -90,6 +92,7 @@ async function loadHistory(
       "chat_messages.created_at",
       "chat_messages.edited_at",
       "users.name as author",
+      "users.image as author_image",
     ]);
 
   if (before) {
@@ -195,6 +198,7 @@ export const chatRouter = {
         roomId: info.input.roomId,
         body: info.input.body,
         author: info.context.user.name ?? null,
+        authorImage: info.context.user.image ?? null,
         createdBy: info.context.user.id,
         createdAt: toIso(row.created_at),
         editedAt: null,

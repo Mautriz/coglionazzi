@@ -4,6 +4,7 @@ import { EventPublisher } from "@orpc/server";
 export interface GamePresenceUser {
   userId: string;
   name: string | null;
+  image: string | null;
 }
 
 /** What `game.sessions.subscribe` streams. High-frequency `votes` carry live

@@ -91,7 +91,7 @@ export async function attachCardExtras<T extends CardRow>(
     .selectFrom("card_assignees")
     .innerJoin("users", "users.id", "card_assignees.user_id")
     .where("card_assignees.card_id", "in", cardIds)
-    .select(["card_assignees.card_id", "users.id", "users.name"])
+    .select(["card_assignees.card_id", "users.id", "users.name", "users.image"])
     .execute();
 
   // Relations are stored normalized (card_id < related_card_id) — fetch both
@@ -160,7 +160,7 @@ export async function attachCardExtras<T extends CardRow>(
       card.description == null ? null : JSON.stringify(card.description),
     assignees: assignees
       .filter((a) => a.card_id === card.id)
-      .map((a) => ({ id: a.id, name: a.name })),
+      .map((a) => ({ id: a.id, name: a.name, image: a.image })),
     relations: relationsOf(card.id),
     // count(*) is bigint → pg hands it over as a string.
     commentCount: Number(

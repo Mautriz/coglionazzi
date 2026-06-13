@@ -132,7 +132,13 @@ function RouteComponent() {
                 {card.assignees.length > 0 && (
                   <span className="inline-flex shrink-0 -space-x-1.5">
                     {card.assignees.slice(0, 3).map((a) => (
-                      <UserAvatar key={a.id} id={a.id} name={a.name} size="xs" />
+                      <UserAvatar
+                        key={a.id}
+                        id={a.id}
+                        name={a.name}
+                        image={a.image}
+                        size="xs"
+                      />
                     ))}
                   </span>
                 )}

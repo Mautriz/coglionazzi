@@ -98,7 +98,7 @@ function Lobby({
   livePlayers,
 }: {
   session: Session;
-  livePlayers: { userId: string; name: string | null }[] | null;
+  livePlayers: { userId: string; name: string | null; image: string | null }[] | null;
 }) {
   const players = livePlayers ?? session.players;
   const [cardCount, setCardCount] = useState(
@@ -121,7 +121,7 @@ function Lobby({
         <div className="flex flex-wrap gap-3">
           {players.map((p) => (
             <span key={p.userId} className="flex items-center gap-1.5 text-sm">
-              <UserAvatar id={p.userId} name={p.name ?? "?"} />
+              <UserAvatar id={p.userId} name={p.name ?? "?"} image={p.image} />
               {p.name ?? "Someone"}
             </span>
           ))}

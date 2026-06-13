@@ -179,6 +179,25 @@ Postgres + a `uploads` volume for assets.
   read-only (`getSession`).
 - better-auth maps camelCase fields to snake_case columns in
   `src/server/auth.ts` — new auth-related tables must follow that pattern.
+- **Discord OAuth** (optional): `socialProviders.discord` is registered only
+  when `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` are set (so dev boots
+  without them). The `<DiscordSignInButton>` (`components/custom/SocialAuth.tsx`)
+  on both auth pages calls `authClient.signIn.social({provider:"discord",
+  callbackURL:"/home"})` — a FULL-PAGE redirect, so the page reloads fresh and
+  the realtime socket re-upgrades on its own (NO `reconnectRealtimeSocket()`,
+  unlike email login/signup). Redirect URL to register with Discord:
+  `${VITE_FRONTEND_URL}/api/auth/callback/discord`.
+- **Account linking** is on with `trustedProviders: ["discord"]`
+  (`account.accountLinking` in `auth.ts`): signing in with Discord
+  auto-links to an existing account with the same email. Only safe because
+  Discord verifies emails — NEVER add a provider that doesn't (silent account
+  takeover). Untrusted providers keep better-auth's default (refuse + error).
+- **Profile pictures:** better-auth populates `users.image` from the provider
+  (Discord avatar). `<UserAvatar image=…>` renders it and falls back to
+  hash-colored initials when absent. Any query that feeds an avatar must
+  `select` `users.image` and pass it through — already wired for `user.list`,
+  `team.members`, card assignees (`board.get`/`archive.list`), chat authors
+  (`authorImage` on the message payload), and board + game-lobby presence.
 
 ### Database
 

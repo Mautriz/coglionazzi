@@ -19,6 +19,7 @@ export function PresenceStack({ boardId }: { boardId: string }) {
           key={viewer.userId}
           id={viewer.userId}
           name={viewer.name ?? "Someone"}
+          image={viewer.image}
           className="ring-2 ring-background"
         />
       ))}

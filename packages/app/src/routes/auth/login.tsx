@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { LinkWithDescription } from "~/components/custom/linkWithDescription";
 import { useAppForm } from "~/components/custom/AppForm";
+import { AuthDivider, DiscordSignInButton } from "~/components/custom/SocialAuth";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardTitle } from "~/components/ui/card";
 import { authClient } from "~/lib/authClient";
@@ -109,6 +110,9 @@ function RouteComponent() {
               )}
             </form.SubscribeButton>
           </form.AppForm>
+
+          <AuthDivider />
+          <DiscordSignInButton />
 
           <LinkWithDescription
             href="/auth/sign-up"

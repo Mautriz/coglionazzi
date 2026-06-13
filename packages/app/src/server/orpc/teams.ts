@@ -133,7 +133,7 @@ export const teamRouter = {
         .selectFrom("team_members")
         .innerJoin("users", "users.id", "team_members.user_id")
         .where("team_members.team_id", "=", info.input.teamId)
-        .select(["users.id", "users.name", "team_members.role"])
+        .select(["users.id", "users.name", "users.image", "team_members.role"])
         .orderBy("users.name", "asc")
         .execute();
     }),
