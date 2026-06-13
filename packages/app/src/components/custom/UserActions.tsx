@@ -4,6 +4,7 @@ import { MoonIcon, SunIcon } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { authClient } from "~/lib/authClient";
 import { toggleTheme, useTheme } from "~/lib/theme";
+import { BrandPicker } from "~/components/custom/BrandPicker";
 
 /** Theme toggle + logout, shared by the topbar and the boards sidebar. */
 export function UserActions() {
@@ -20,6 +21,7 @@ export function UserActions() {
 
   return (
     <>
+      <BrandPicker />
       <Button variant="ghost" size="icon" onClick={toggleTheme}>
         {theme === "dark" ? <SunIcon /> : <MoonIcon />}
       </Button>

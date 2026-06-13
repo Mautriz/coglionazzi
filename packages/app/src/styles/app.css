@@ -301,6 +301,326 @@
   color: #04222b;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+ * BRAND SKINS — an accent/surface hue layered on top of light/dark, picked
+ * via the topbar swatch picker (`.brand-*` class on <html>, see lib/theme.ts).
+ * `deepsea` is the @theme default (electric cyan) and needs no overrides.
+ * The others fully retint the DARK surfaces (which are hue-tinted, so a warm
+ * accent on the teal-navy would clash) and, in LIGHT mode, only swap the
+ * accents + the soft sidebar wash + card glow (light surfaces are near-neutral
+ * gray, brand-agnostic). Compound `.dark.brand-x` / `.light.brand-x` selectors
+ * outrank the single-class `.dark` / `.light` blocks above.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────── Neon Arcade (violet → fuchsia) ───────────────── */
+.dark.brand-arcade {
+  --color-primary: #a855f7;
+  --color-primary-foreground: #f3e8ff;
+  --color-link: #c084fc;
+  --color-ring: #a855f7;
+  --color-gradient-from: #a855f7;
+  --color-gradient-to: #7e22ce;
+  --main-gradient: linear-gradient(105deg, #a855f7 0%, #c026d3 58%, #e879f9 125%);
+
+  --color-background: #0f0a1a;
+  --color-foreground: #f4ecfb;
+  --color-card: #1a1226;
+  --color-card-foreground: #f4ecfb;
+  --color-card-border: rgba(168, 85, 247, 0.1);
+  --color-popover: #1a1226;
+  --color-popover-foreground: #f4ecfb;
+
+  --color-border: #2a1c3d;
+  --color-border1: #34254a;
+  --color-input: #1c1430;
+  --color-input-border: rgba(168, 85, 247, 0.1);
+  --color-input-unfocused: #a795b8;
+  --color-button-border: #2a1c3d;
+  --color-button-background: rgba(26, 18, 38, 0.5);
+  --color-secondary: #241634;
+  --color-secondary-foreground: #f4ecfb;
+  --color-accent: #281a3c;
+  --color-accent-foreground: #f4ecfb;
+  --color-muted: #190f28;
+  --color-muted-foreground: #a795b8;
+
+  --color-sidebar: #120a1f;
+  --color-sidebar-foreground: #ecdcf8;
+  --color-sidebar-primary: #a855f7;
+  --color-sidebar-primary-foreground: #1c0f2b;
+  --color-sidebar-accent: #2a1740;
+  --color-sidebar-accent-foreground: #d8b4fe;
+  --color-sidebar-border: #2c1d40;
+  --color-sidebar-ring: #a855f7;
+
+  --color-scrollbar-thumb: #2e2042;
+  --color-scrollbar-thumb-hover: rgba(168, 85, 247, 0.5);
+}
+.dark.brand-arcade [data-slot="card"],
+.dark.brand-arcade [data-slot="card"]:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.45),
+    0 10px 28px -10px rgba(168, 85, 247, 0.2) !important;
+}
+.dark.brand-arcade [data-slot="sidebar-inner"],
+.dark.brand-arcade [data-sidebar="sidebar"] {
+  background-image: linear-gradient(180deg, #1a1030 0%, #0c0717 100%);
+}
+.dark.brand-arcade .app-topbar {
+  background-image: linear-gradient(90deg, #1a1030 0%, #0c0717 100%);
+  border-color: #2c1d40;
+}
+.dark.brand-arcade .special {
+  --color-primary-foreground: #1c0f2b !important;
+  color: #1c0f2b;
+  text-shadow: 0 1px 1px rgba(248, 240, 255, 0.25);
+  box-shadow: 0 2px 10px -3px rgba(192, 38, 211, 0.45);
+}
+.dark.brand-arcade .special:hover {
+  box-shadow: 0 4px 14px -3px rgba(232, 121, 249, 0.5);
+}
+.dark.brand-arcade [data-slot="badge"].bg-primary {
+  --color-primary-foreground: #1c0f2b;
+  color: #1c0f2b;
+}
+.dark.brand-arcade ::selection {
+  color: #1c0f2b;
+}
+.light.brand-arcade {
+  --color-primary: #9333ea;
+  --color-link: #9333ea;
+  --color-ring: #a855f7;
+  --color-gradient-from: #a855f7;
+  --color-gradient-to: #7e22ce;
+  --main-gradient: linear-gradient(105deg, #a855f7 0%, #c026d3 58%, #e879f9 125%);
+  --color-scrollbar-thumb-hover: rgba(147, 51, 234, 0.5);
+  --color-sidebar: #faf5ff;
+  --color-sidebar-border: #ead8fb;
+  --color-sidebar-accent: #f0e4fc;
+  --color-sidebar-accent-foreground: #7e22ce;
+  --color-sidebar-ring: #a855f7;
+}
+.light.brand-arcade [data-slot="card"],
+.light.brand-arcade [data-slot="card"]:hover {
+  box-shadow:
+    0 2px 4px rgba(15, 27, 36, 0.08),
+    0 8px 20px -6px rgba(147, 51, 234, 0.2) !important;
+}
+.light.brand-arcade [data-slot="sidebar-inner"],
+.light.brand-arcade [data-sidebar="sidebar"] {
+  background-image: linear-gradient(180deg, #faf5ff 0%, #f3e8ff 100%);
+}
+.light.brand-arcade .app-topbar {
+  background-image: linear-gradient(90deg, #faf5ff 0%, #f3e8ff 100%);
+  border-color: #ead8fb;
+}
+
+/* ─────────────────────────── Blurple (indigo) ───────────────────────────── */
+.dark.brand-blurple {
+  --color-primary: #818cf8;
+  --color-primary-foreground: #e0e7ff;
+  --color-link: #a5b4fc;
+  --color-ring: #818cf8;
+  --color-gradient-from: #6366f1;
+  --color-gradient-to: #4338ca;
+  --main-gradient: linear-gradient(105deg, #6366f1 0%, #818cf8 58%, #a5b4fc 125%);
+
+  --color-background: #0b0e1a;
+  --color-foreground: #e8ecfb;
+  --color-card: #151a2c;
+  --color-card-foreground: #e8ecfb;
+  --color-card-border: rgba(129, 140, 248, 0.1);
+  --color-popover: #151a2c;
+  --color-popover-foreground: #e8ecfb;
+
+  --color-border: #232a42;
+  --color-border1: #2c3450;
+  --color-input: #161c30;
+  --color-input-border: rgba(129, 140, 248, 0.1);
+  --color-input-unfocused: #95a0c0;
+  --color-button-border: #232a42;
+  --color-button-background: rgba(21, 26, 44, 0.5);
+  --color-secondary: #1d2438;
+  --color-secondary-foreground: #e8ecfb;
+  --color-accent: #202840;
+  --color-accent-foreground: #e8ecfb;
+  --color-muted: #131829;
+  --color-muted-foreground: #95a0c0;
+
+  --color-sidebar: #0c1020;
+  --color-sidebar-foreground: #dce2fb;
+  --color-sidebar-primary: #818cf8;
+  --color-sidebar-primary-foreground: #0f1326;
+  --color-sidebar-accent: #1e2542;
+  --color-sidebar-accent-foreground: #c7d2fe;
+  --color-sidebar-border: #232a44;
+  --color-sidebar-ring: #818cf8;
+
+  --color-scrollbar-thumb: #242c46;
+  --color-scrollbar-thumb-hover: rgba(129, 140, 248, 0.5);
+}
+.dark.brand-blurple [data-slot="card"],
+.dark.brand-blurple [data-slot="card"]:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.45),
+    0 10px 28px -10px rgba(129, 140, 248, 0.2) !important;
+}
+.dark.brand-blurple [data-slot="sidebar-inner"],
+.dark.brand-blurple [data-sidebar="sidebar"] {
+  background-image: linear-gradient(180deg, #141a30 0%, #090c18 100%);
+}
+.dark.brand-blurple .app-topbar {
+  background-image: linear-gradient(90deg, #141a30 0%, #090c18 100%);
+  border-color: #232a44;
+}
+.dark.brand-blurple .special {
+  --color-primary-foreground: #0f1326 !important;
+  color: #0f1326;
+  text-shadow: 0 1px 1px rgba(240, 243, 255, 0.25);
+  box-shadow: 0 2px 10px -3px rgba(99, 102, 241, 0.45);
+}
+.dark.brand-blurple .special:hover {
+  box-shadow: 0 4px 14px -3px rgba(165, 180, 252, 0.5);
+}
+.dark.brand-blurple [data-slot="badge"].bg-primary {
+  --color-primary-foreground: #0f1326;
+  color: #0f1326;
+}
+.dark.brand-blurple ::selection {
+  color: #0f1326;
+}
+.light.brand-blurple {
+  --color-primary: #4f46e5;
+  --color-link: #4f46e5;
+  --color-ring: #818cf8;
+  --color-gradient-from: #6366f1;
+  --color-gradient-to: #4338ca;
+  --main-gradient: linear-gradient(105deg, #6366f1 0%, #818cf8 58%, #a5b4fc 125%);
+  --color-scrollbar-thumb-hover: rgba(79, 70, 229, 0.5);
+  --color-sidebar: #eef2ff;
+  --color-sidebar-border: #d6ddfb;
+  --color-sidebar-accent: #e0e7ff;
+  --color-sidebar-accent-foreground: #4338ca;
+  --color-sidebar-ring: #818cf8;
+}
+.light.brand-blurple [data-slot="card"],
+.light.brand-blurple [data-slot="card"]:hover {
+  box-shadow:
+    0 2px 4px rgba(15, 27, 36, 0.08),
+    0 8px 20px -6px rgba(79, 70, 229, 0.2) !important;
+}
+.light.brand-blurple [data-slot="sidebar-inner"],
+.light.brand-blurple [data-sidebar="sidebar"] {
+  background-image: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%);
+}
+.light.brand-blurple .app-topbar {
+  background-image: linear-gradient(90deg, #eef2ff 0%, #e0e7ff 100%);
+  border-color: #d6ddfb;
+}
+
+/* ────────────────────── Party Sunset (orange → rose → magenta) ──────────── */
+.dark.brand-sunset {
+  --color-primary: #fb7185;
+  --color-primary-foreground: #ffe4e6;
+  --color-link: #fb7185;
+  --color-ring: #fb7185;
+  --color-gradient-from: #fb923c;
+  --color-gradient-to: #e11d48;
+  --main-gradient: linear-gradient(105deg, #fb923c 0%, #f43f5e 55%, #d946ef 120%);
+
+  --color-background: #160b12;
+  --color-foreground: #fbeef0;
+  --color-card: #241019;
+  --color-card-foreground: #fbeef0;
+  --color-card-border: rgba(251, 113, 133, 0.1);
+  --color-popover: #241019;
+  --color-popover-foreground: #fbeef0;
+
+  --color-border: #3a1d29;
+  --color-border1: #46232f;
+  --color-input: #261019;
+  --color-input-border: rgba(251, 113, 133, 0.1);
+  --color-input-unfocused: #bb95a0;
+  --color-button-border: #3a1d29;
+  --color-button-background: rgba(36, 16, 25, 0.5);
+  --color-secondary: #321420;
+  --color-secondary-foreground: #fbeef0;
+  --color-accent: #3a1826;
+  --color-accent-foreground: #fbeef0;
+  --color-muted: #1f0d15;
+  --color-muted-foreground: #bb95a0;
+
+  --color-sidebar: #190a11;
+  --color-sidebar-foreground: #f8dde2;
+  --color-sidebar-primary: #fb7185;
+  --color-sidebar-primary-foreground: #2a0f17;
+  --color-sidebar-accent: #3a1622;
+  --color-sidebar-accent-foreground: #fda4af;
+  --color-sidebar-border: #361620;
+  --color-sidebar-ring: #fb7185;
+
+  --color-scrollbar-thumb: #3a2029;
+  --color-scrollbar-thumb-hover: rgba(251, 113, 133, 0.5);
+}
+.dark.brand-sunset [data-slot="card"],
+.dark.brand-sunset [data-slot="card"]:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.45),
+    0 10px 28px -10px rgba(251, 113, 133, 0.2) !important;
+}
+.dark.brand-sunset [data-slot="sidebar-inner"],
+.dark.brand-sunset [data-sidebar="sidebar"] {
+  background-image: linear-gradient(180deg, #25101a 0%, #120810 100%);
+}
+.dark.brand-sunset .app-topbar {
+  background-image: linear-gradient(90deg, #25101a 0%, #120810 100%);
+  border-color: #361620;
+}
+.dark.brand-sunset .special {
+  --color-primary-foreground: #2a0f17 !important;
+  color: #2a0f17;
+  text-shadow: 0 1px 1px rgba(255, 240, 243, 0.25);
+  box-shadow: 0 2px 10px -3px rgba(244, 63, 94, 0.45);
+}
+.dark.brand-sunset .special:hover {
+  box-shadow: 0 4px 14px -3px rgba(217, 70, 239, 0.5);
+}
+.dark.brand-sunset [data-slot="badge"].bg-primary {
+  --color-primary-foreground: #2a0f17;
+  color: #2a0f17;
+}
+.dark.brand-sunset ::selection {
+  color: #2a0f17;
+}
+.light.brand-sunset {
+  --color-primary: #e11d48;
+  --color-link: #e11d48;
+  --color-ring: #fb7185;
+  --color-gradient-from: #fb923c;
+  --color-gradient-to: #e11d48;
+  --main-gradient: linear-gradient(105deg, #fb923c 0%, #f43f5e 55%, #d946ef 120%);
+  --color-scrollbar-thumb-hover: rgba(225, 29, 72, 0.5);
+  --color-sidebar: #fff1f2;
+  --color-sidebar-border: #fbd5da;
+  --color-sidebar-accent: #ffe4e6;
+  --color-sidebar-accent-foreground: #be123c;
+  --color-sidebar-ring: #fb7185;
+}
+.light.brand-sunset [data-slot="card"],
+.light.brand-sunset [data-slot="card"]:hover {
+  box-shadow:
+    0 2px 4px rgba(15, 27, 36, 0.08),
+    0 8px 20px -6px rgba(225, 29, 72, 0.2) !important;
+}
+.light.brand-sunset [data-slot="sidebar-inner"],
+.light.brand-sunset [data-sidebar="sidebar"] {
+  background-image: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%);
+}
+.light.brand-sunset .app-topbar {
+  background-image: linear-gradient(90deg, #fff1f2 0%, #ffe4e6 100%);
+  border-color: #fbd5da;
+}
+
 /* ─────────────────────────────── Base layer ─────────────────────────────── */
 @layer base {
   *,
