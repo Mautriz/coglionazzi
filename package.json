@@ -11,6 +11,7 @@
     "start": "npm run start -w @this/app",
     "type-check": "turbo run type-check",
     "lint": "turbo run lint",
+    "test": "turbo run test",
     "migrate": "npm run migrate -w @this/app",
     "rollback": "npm run rollback -w @this/app",
     "genDbTypes": "npm run genDbTypes -w @this/app",

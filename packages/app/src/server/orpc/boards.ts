@@ -37,7 +37,7 @@ async function nextCardPosition(columnId: string): Promise<number> {
 
 export const boardRouter = {
   list: authP.handler(async () => {
-    return db
+    const boards = await db
       .selectFrom("boards")
       .leftJoin("board_columns", "board_columns.board_id", "boards.id")
       .leftJoin("cards", "cards.column_id", "board_columns.id")
@@ -50,6 +50,9 @@ export const boardRouter = {
       .groupBy(["boards.id", "boards.name", "boards.created_at"])
       .orderBy("boards.created_at", "asc")
       .execute();
+
+    // count(*) is bigint → pg hands it over as a string.
+    return boards.map((b) => ({ ...b, cardCount: Number(b.cardCount) }));
   }),
 
   create: authP
@@ -153,8 +156,10 @@ export const boardRouter = {
         // jsonb comes back parsed; the editor wants the serialized string.
         description:
           card.description == null ? null : JSON.stringify(card.description),
-        commentCount:
+        // count(*) is bigint → pg hands it over as a string.
+        commentCount: Number(
           commentCounts.find((c) => c.entity_id === card.id)?.count ?? 0,
+        ),
         attachments: attachments
           .filter((a) => a.card_id === card.id)
           .map((a) => ({

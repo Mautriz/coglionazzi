@@ -73,6 +73,7 @@ Run from repo root:
 - `npm run dev` — dev server at http://localhost:3300 (Postgres must be up: `docker compose up -d`)
 - `npm run build` / `npm run start` — production build / serve
 - `npm run type-check` — tsc over the app
+- `npm test` — vitest (needs Postgres up; uses a dedicated `coglionazzi_test` DB)
 - `npm run migrate` / `npm run rollback` — Kysely migrations (uses packages/.env)
 - `npm run genDbTypes` — regenerate `src/server/dbtypes.ts` from the live DB
 
@@ -196,6 +197,33 @@ Run from repo root:
 - Gotcha: jsonb columns come back from pg as parsed objects — serialize
   with `JSON.stringify` when returning editor states to the client (the
   editor's `initialState` wants the string).
+
+### Search
+
+- Global fuzzy search lives in `src/server/orpc/search.ts` (pg_trgm:
+  `ILIKE` substring OR `word_similarity >= 0.45`, GIN trigram indexes).
+  Lexical jsonb fields are NEVER searched directly — plain text is
+  extracted at write time (`extractLexicalText`) into `*_text` companion
+  columns (`cards.description_text`, `comments.body_text`). New rich-text
+  fields that should be searchable need the same companion column +
+  trigram index + write-path extraction.
+- UI: `<SearchBox />` in the /home topbar; card/comment results deep-link
+  via the board route's `?card=` param.
+
+### Testing (vitest)
+
+- `npm test` runs vitest per workspace. Tests hit a real Postgres: a
+  dedicated `<dbname>_test` database is created + migrated by
+  `test/global-setup.ts`; `src/server/db.ts` pins the pool to ONE
+  connection under `NODE_ENV=test` and `test/db.ts` wraps every test in
+  BEGIN/ROLLBACK — no cleanup needed, but test files run serially
+  (`fileParallelism: false`), don't change that.
+- Call oRPC procedures directly with `call(router.proc, input, { context })`
+  from `@orpc/server`; `signUpTestUser()` (test/helpers.ts) creates a real
+  better-auth user and returns a context whose `reqHeaders` satisfy `authP`.
+  `lexicalState("text")` builds a minimal serialized editor state.
+- Pure helpers get unit tests next to the source (`src/**/*.test.ts`);
+  DB/procedure tests live in `test/`.
 
 ### Misc
 

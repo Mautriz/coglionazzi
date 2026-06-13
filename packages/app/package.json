@@ -8,6 +8,8 @@
     "build": "dotenv -e ../.env${ENV:+.${ENV}} -- vite build && tsc --noEmit",
     "start": "node --env-file-if-exists=../.env${ENV:+.${ENV}} .output/server/index.mjs",
     "type-check": "tsc --noEmit",
+    "test": "dotenv -e ../.env -- vitest run",
+    "test:watch": "dotenv -e ../.env -- vitest",
     "genDbTypes": "dotenv -e ../.env -- kysely-codegen",
     "migrate": "dotenv -e ../.env -- kysely migrate:latest",
     "rollback": "dotenv -e ../.env -- kysely migrate:down"
@@ -65,7 +67,8 @@
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
     "vite": "^7.3.2",
-    "vite-tsconfig-paths": "^6.0.5"
+    "vite-tsconfig-paths": "^6.0.5",
+    "vitest": "^4.1.8"
   },
   "kysely-codegen": {
     "outFile": "./src/server/dbtypes.ts",
