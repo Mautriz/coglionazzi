@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { publishTeamChanged, publisher } from "../realtime/publisher";
 import { authP } from "./base";
+import { deleteRoomsByKindOwner } from "./roomAccess";
 import {
   assertTeamMember,
   assertTeamOwner,
@@ -14,22 +15,16 @@ import {
  *  rooms of all its cards (no FK on owner_id, so a teams cascade would orphan
  *  them; their messages/reactions cascade off the rooms). */
 async function deleteTeamRooms(teamId: string) {
-  await db
-    .deleteFrom("chat_rooms")
-    .where((eb) =>
-      eb.or([
-        eb.and([eb("kind", "=", "team"), eb("owner_id", "=", teamId)]),
-        eb.and([
-          eb("kind", "=", "card"),
-          eb(
-            "owner_id",
-            "in",
-            db.selectFrom("cards").where("team_id", "=", teamId).select("id"),
-          ),
-        ]),
-      ]),
-    )
+  const cards = await db
+    .selectFrom("cards")
+    .where("team_id", "=", teamId)
+    .select("id")
     .execute();
+  await deleteRoomsByKindOwner("team", teamId);
+  await deleteRoomsByKindOwner(
+    "card",
+    cards.map((c) => c.id),
+  );
 }
 
 export const teamRouter = {

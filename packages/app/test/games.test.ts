@@ -2,6 +2,7 @@ import { call, ORPCError } from "@orpc/server";
 import { afterEach, describe, expect, it } from "vitest";
 import { db } from "../src/server/db";
 import { gameRouter } from "../src/server/orpc/game";
+import { closeEmptyLobby } from "../src/server/orpc/game/sessions";
 import { joinGamePresence } from "../src/server/realtime/gamePublisher";
 import { __setVersusTimings } from "../src/server/realtime/versusEngine";
 import { createTestTeam, signUpTestUser } from "./helpers";
@@ -152,6 +153,86 @@ describe("game sessions — access", () => {
     expect(ids).toContain(pub.id);
     expect(ids).not.toContain(linkOnly.id);
     expect(ids).not.toContain(teamPriv.id);
+  });
+});
+
+describe("game lobbies — auto-close when empty", () => {
+  it("deletes an empty lobby and its game chat room", async () => {
+    const { context, email } = await signUpTestUser();
+    const userId = await userIdOf(email);
+    const deckId = await makeDeck(context, userId, 4);
+    const { id: sessionId } = await call(
+      gameRouter.sessions.create,
+      { deckId, visibility: "public" },
+      { context },
+    );
+    // Seed the session's game chat room (lazily made on first open).
+    await db
+      .insertInto("chat_rooms")
+      .values({ kind: "game", owner_id: sessionId })
+      .execute();
+
+    await closeEmptyLobby(sessionId);
+
+    const session = await db
+      .selectFrom("game_sessions")
+      .where("id", "=", sessionId)
+      .select("id")
+      .executeTakeFirst();
+    expect(session).toBeUndefined();
+    const room = await db
+      .selectFrom("chat_rooms")
+      .where("kind", "=", "game")
+      .where("owner_id", "=", sessionId)
+      .select("id")
+      .executeTakeFirst();
+    expect(room).toBeUndefined();
+  });
+
+  it("keeps a lobby that still has a viewer present", async () => {
+    const { context, email } = await signUpTestUser();
+    const userId = await userIdOf(email);
+    const deckId = await makeDeck(context, userId, 4);
+    const { id: sessionId } = await call(
+      gameRouter.sessions.create,
+      { deckId, visibility: "public" },
+      { context },
+    );
+    joinGamePresence(sessionId, { userId, name: "Host", image: null });
+
+    await closeEmptyLobby(sessionId);
+
+    const session = await db
+      .selectFrom("game_sessions")
+      .where("id", "=", sessionId)
+      .select("id")
+      .executeTakeFirst();
+    expect(session).toBeDefined();
+  });
+
+  it("never closes a started (active) game even with no one present", async () => {
+    const { context, email } = await signUpTestUser();
+    const userId = await userIdOf(email);
+    const deckId = await makeDeck(context, userId, 4);
+    const { id: sessionId } = await call(
+      gameRouter.sessions.create,
+      { deckId, visibility: "public" },
+      { context },
+    );
+    await db
+      .updateTable("game_sessions")
+      .set({ status: "active" })
+      .where("id", "=", sessionId)
+      .execute();
+
+    await closeEmptyLobby(sessionId);
+
+    const session = await db
+      .selectFrom("game_sessions")
+      .where("id", "=", sessionId)
+      .select("status")
+      .executeTakeFirst();
+    expect(session?.status).toBe("active");
   });
 });
 

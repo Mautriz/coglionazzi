@@ -1,5 +1,6 @@
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/classUtils";
+import { pickByHash } from "~/lib/colorUtils";
 
 /** Stable per-tag color: hash the tag name into a small palette. */
 const TAG_PALETTE = [
@@ -10,14 +11,6 @@ const TAG_PALETTE = [
   "border-red1/40 bg-red1/10 text-red1",
   "border-purple/40 bg-purple/10 text-purple",
 ];
-
-function hashTag(tag: string) {
-  let hash = 0;
-  for (let i = 0; i < tag.length; i++) {
-    hash = (hash * 31 + tag.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
 
 export function TagBadge({
   tag,
@@ -30,7 +23,7 @@ export function TagBadge({
   return (
     <Badge
       variant="outline"
-      className={cn(TAG_PALETTE[hashTag(tag) % TAG_PALETTE.length], className)}
+      className={cn(pickByHash(tag, TAG_PALETTE), className)}
     >
       {tag}
       {children}

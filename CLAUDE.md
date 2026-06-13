@@ -84,6 +84,7 @@ packages/
         │   ├── files.ts           # disk storage; optimizes images on upload (sharp)
         │   ├── realtime/
         │   │   ├── publisher.ts   # shared EventPublisher + chatPublisher (room-keyed)
+        │   │   ├── presenceRegistry.ts # shared keyed-presence primitive (dedupeByUser)
         │   │   ├── presence.ts    # in-memory per-board viewer registry
         │   │   ├── globalPresence.ts # in-memory app-wide connected-user registry
         │   │   ├── gamePublisher.ts # session-keyed game events + lobby presence
@@ -382,10 +383,12 @@ Postgres + a `uploads` volume for assets.
   Date
   range compares UTC calendar days (inclusive); the UI uses `<DatePicker>`
   (popover +
-  shadcn `Calendar`/react-day-picker). `<AssigneeCombobox>` (popover +
-  cmdk `Command`) is the searchable multi-select used for both card
-  assignees and the assignee filter. `<UserAvatar>` renders hash-colored
-  initials, reused on cards and in the pickers.
+  shadcn `Calendar`/react-day-picker). `<AssigneeCombobox>` and `<TagCombobox>`
+  are thin wrappers over the shared `<ComboboxMultiSelect>` shell (chips +
+  popover + cmdk `Command` list; `custom/`) — the searchable multi-selects for
+  card assignees / the assignee filter and for tags. Build new searchable
+  multi-selects on that shell. `<UserAvatar>` renders hash-colored initials
+  (via `lib/colorUtils`), reused on cards and in the pickers.
 
 ### Card archive
 
@@ -437,9 +440,11 @@ Postgres + a `uploads` volume for assets.
 - `src/server/orpc/roomAccess.ts`: `roomRefSchema` (the `{scope}` union),
   `assertRefAccess` (gate BEFORE create), `resolveRoom` (find-or-create —
   rooms are lazily made on first open), `assertRoomAccess(userId, roomId)`
-  (the read/write gate for every by-roomId procedure). Cleanup is explicit:
-  `deleteCardRooms` (archive.purge) and `deleteTeamRooms` (team.delete) drop
-  rooms whose owner is gone (messages/reactions cascade off the room FK).
+  (the read/write gate for every by-roomId procedure). Cleanup is explicit and
+  all goes through `deleteRoomsByKindOwner(kind, owners)`: `deleteCardRooms`
+  (archive.purge), `deleteTeamRooms` (team.delete) and `closeEmptyLobby`
+  (empty-lobby reap) drop rooms whose owner is gone (messages/reactions cascade
+  off the room FK).
 - `chat_messages(room_id, body jsonb, body_text, created_by, edited_at)` +
   `chat_message_reactions(message_id, user_id, emoji)` (PK all three →
   one of each emoji per user per message). `created_at` is set with
@@ -612,10 +617,12 @@ Postgres + a `uploads` volume for assets.
   yields the current roster immediately then on every join/leave, and
   deregisters in its `finally` (run when oRPC aborts the generator on socket
   close). `<PresenceStack>` renders the live avatar stack on the board.
-  There are THREE presence registries, same shape (in-memory, deduped by
-  user, leave-in-`finally`): per-board (`presence.ts`), per-game-session
-  (`gamePublisher.ts`), and **app-wide** (`globalPresence.ts` +
-  `orpc/globalPresence.ts`, on the shared `globalPresence` channel).
+  There are THREE presence registries, all built on the shared
+  `presenceRegistry.ts` primitive (`createKeyedPresence` + `dedupeByUser`) —
+  they differ only in how they broadcast the roster: per-board (`presence.ts`),
+  per-game-session (`gamePublisher.ts`), and **app-wide** (`globalPresence.ts`
+  + `orpc/globalPresence.ts`, a single constant key, on the shared
+  `globalPresence` channel). Build any new presence registry on that primitive.
   `globalPresence.subscribe` (any logged-in user, no entity check) streams the
   full roster; `<ConnectedUsersCount>` renders the topbar online count + a
   hover roster (shared `<LiveDot>` motif). The game play view shows the same

@@ -10,6 +10,7 @@ import {
 } from "../../realtime/gamePublisher";
 import { liveDeadline } from "../../realtime/versusEngine";
 import { authP } from "../base";
+import { deleteRoomsByKindOwner } from "../roomAccess";
 import { assertTeamMember } from "../teamAccess";
 import { assertSessionAccess } from "./access";
 import { powerOfTwoSizes } from "./util";
@@ -35,6 +36,36 @@ async function deckCardViews(deckId: string) {
     description: r.description,
     url: fileUrl(r.path),
   }));
+}
+
+/** Auto-close an empty lobby: when the last viewer leaves a lobby's live
+ *  presence, the never-started session is worthless, so we delete it (and its
+ *  game chat room — no FK on `owner_id`, so we drop it explicitly, mirroring
+ *  `deleteTeamRooms`; messages/reactions cascade off the room). No-ops unless
+ *  the session is STILL in `lobby` status AND presence is now empty — a started
+ *  game keeps its frozen roster, and a last-instant re-join cancels the close.
+ *  Single instance (see publisher.ts): a restart loses in-memory presence, so a
+ *  lobby orphaned across a restart gets no leave event to reap it — same
+ *  constraint as the versus engine's live timer. */
+export async function closeEmptyLobby(sessionId: string): Promise<void> {
+  if (gamePresenceSnapshot(sessionId).length > 0) return;
+  const s = await db
+    .selectFrom("game_sessions")
+    .where("id", "=", sessionId)
+    .select("status")
+    .executeTakeFirst();
+  if (s?.status !== "lobby") return;
+  // Re-check after the await — someone may have re-joined meanwhile.
+  if (gamePresenceSnapshot(sessionId).length > 0) return;
+
+  await deleteRoomsByKindOwner("game", sessionId);
+  // `status = 'lobby'` guards a race where start() flipped it between our read
+  // and this delete.
+  await db
+    .deleteFrom("game_sessions")
+    .where("id", "=", sessionId)
+    .where("status", "=", "lobby")
+    .execute();
 }
 
 /** `game.sessions.*` — the shared lobby lifecycle (kind-agnostic). The in-game
@@ -266,6 +297,8 @@ export const sessionRouter = {
         }
       } finally {
         leave();
+        // Last viewer out of a not-yet-started lobby → reap it instantly.
+        await closeEmptyLobby(info.input.sessionId);
       }
     }),
 };

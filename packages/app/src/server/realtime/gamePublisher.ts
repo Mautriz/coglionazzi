@@ -1,11 +1,10 @@
 import { EventPublisher } from "@orpc/server";
+import { createKeyedPresence } from "./presenceRegistry";
+import type { PresenceViewer } from "./publisher";
 
-/** A user present in a game lobby (deduped by id — multiple tabs count once). */
-export interface GamePresenceUser {
-  userId: string;
-  name: string | null;
-  image: string | null;
-}
+/** A user present in a game lobby (deduped by id — multiple tabs count once).
+ *  Same shape as a board viewer. */
+export type GamePresenceUser = PresenceViewer;
 
 /** What `game.sessions.subscribe` streams. High-frequency `votes` carry live
  *  tallies + the (possibly shortened) deadline; the low-frequency `state`
@@ -42,43 +41,20 @@ export function publishGame(sessionId: string, event: GameEvent) {
 }
 
 // --- lobby presence (in-memory, single instance — see publisher.ts) --------
-const lobbies = new Map<string, Map<symbol, GamePresenceUser>>();
-
-function snapshot(sessionId: string): GamePresenceUser[] {
-  const lobby = lobbies.get(sessionId);
-  if (!lobby) return [];
-  const byUser = new Map<string, GamePresenceUser>();
-  for (const u of lobby.values()) byUser.set(u.userId, u);
-  return [...byUser.values()];
-}
+//  Built on the shared keyed registry; broadcasts the roster as a game event.
+const lobbyPresence = createKeyedPresence<GamePresenceUser>(
+  (sessionId, players) =>
+    publishGame(sessionId, { type: "presence", players }),
+);
 
 export function gamePresenceSnapshot(sessionId: string): GamePresenceUser[] {
-  return snapshot(sessionId);
+  return lobbyPresence.snapshot(sessionId);
 }
 
-/** Register a present user and broadcast the new roster. Returns a leave fn
- *  (call it when the subscription ends — socket close / unsubscribe). */
+/** Register a present user; returns a leave fn (call on socket close). */
 export function joinGamePresence(
   sessionId: string,
   user: GamePresenceUser,
 ): () => void {
-  let lobby = lobbies.get(sessionId);
-  if (!lobby) {
-    lobby = new Map();
-    lobbies.set(sessionId, lobby);
-  }
-  const token = Symbol("game-presence");
-  lobby.set(token, user);
-  publishGame(sessionId, { type: "presence", players: snapshot(sessionId) });
-
-  let left = false;
-  return () => {
-    if (left) return;
-    left = true;
-    const current = lobbies.get(sessionId);
-    if (!current) return;
-    current.delete(token);
-    if (current.size === 0) lobbies.delete(sessionId);
-    publishGame(sessionId, { type: "presence", players: snapshot(sessionId) });
-  };
+  return lobbyPresence.join(sessionId, user);
 }

@@ -1,23 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { CheckIcon, ChevronsUpDownIcon, UsersIcon, XIcon } from "lucide-react";
-import { useState } from "react";
+import { UsersIcon, XIcon } from "lucide-react";
+import { ComboboxMultiSelect } from "~/components/custom/ComboboxMultiSelect";
 import { UserAvatar } from "~/components/custom/UserAvatar";
-import { Button } from "~/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "~/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "~/components/ui/popover";
-import { cn } from "~/lib/classUtils";
 import { rpc } from "~/lib/rpcClient";
+
+type UserOption = { id: string; name: string; image: string | null };
 
 /** Searchable multi-select of people. Scoped to a team's members when
  *  `teamId` is given (assignees, filters on a board); falls back to all
@@ -37,20 +24,13 @@ export function AssigneeCombobox({
   placeholder?: string;
   className?: string;
 }) {
-  const [open, setOpen] = useState(false);
   const { data: users } = useQuery(
     teamId
       ? rpc.team.members.queryOptions({ input: { teamId } })
       : rpc.user.list.queryOptions(),
   );
 
-  const byId = new Map(users?.map((u) => [u.id, u]));
-  const chosen = selected.map((id) => byId.get(id)).filter(Boolean) as {
-    id: string;
-    name: string;
-    image: string | null;
-  }[];
-
+  const byId = new Map((users ?? []).map((u) => [u.id, u as UserOption]));
   const toggle = (id: string) =>
     onChange(
       selected.includes(id)
@@ -59,76 +39,46 @@ export function AssigneeCombobox({
     );
 
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      {chosen.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {chosen.map((user) => (
-            <span
-              key={user.id}
-              className="flex items-center gap-1.5 rounded-full border border-card-border bg-accent py-0.5 pl-0.5 pr-1.5 text-xs"
-            >
-              <UserAvatar id={user.id} name={user.name} image={user.image} size="xs" />
-              {user.name}
-              <button
-                type="button"
-                aria-label={`Remove ${user.name}`}
-                onClick={() => toggle(user.id)}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <XIcon className="size-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className="h-8 justify-between font-normal text-muted-foreground"
+    <ComboboxMultiSelect<UserOption>
+      selected={selected}
+      onToggle={toggle}
+      options={(users ?? []) as UserOption[]}
+      getKey={(u) => u.id}
+      getOptionValue={(u) => u.name}
+      icon={<UsersIcon className="size-4" />}
+      label={
+        selected.length > 0 ? `${selected.length} assigned` : placeholder
+      }
+      searchPlaceholder="Search people…"
+      emptyText="No one found."
+      className={className}
+      renderChip={(id, remove) => {
+        const user = byId.get(id);
+        if (!user) return null;
+        return (
+          <span
+            key={id}
+            className="flex items-center gap-1.5 rounded-full border border-card-border bg-accent py-0.5 pl-0.5 pr-1.5 text-xs"
           >
-            <span className="flex items-center gap-2">
-              <UsersIcon className="size-4" />
-              {chosen.length > 0 ? `${chosen.length} assigned` : placeholder}
-            </span>
-            <ChevronsUpDownIcon className="size-4 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search people…" className="h-9" />
-            <CommandList>
-              <CommandEmpty>No one found.</CommandEmpty>
-              <CommandGroup>
-                {users?.map((user) => {
-                  const active = selected.includes(user.id);
-                  return (
-                    <CommandItem
-                      key={user.id}
-                      value={user.name}
-                      onSelect={() => toggle(user.id)}
-                      className="gap-2"
-                    >
-                      <UserAvatar id={user.id} name={user.name} image={user.image} size="xs" />
-                      <span className="truncate">{user.name}</span>
-                      <CheckIcon
-                        className={cn(
-                          "ml-auto size-4 text-primary",
-                          active ? "opacity-100" : "opacity-0",
-                        )}
-                      />
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    </div>
+            <UserAvatar id={user.id} name={user.name} image={user.image} size="xs" />
+            {user.name}
+            <button
+              type="button"
+              aria-label={`Remove ${user.name}`}
+              onClick={remove}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <XIcon className="size-3" />
+            </button>
+          </span>
+        );
+      }}
+      renderOption={(user) => (
+        <>
+          <UserAvatar id={user.id} name={user.name} image={user.image} size="xs" />
+          <span className="truncate">{user.name}</span>
+        </>
+      )}
+    />
   );
 }

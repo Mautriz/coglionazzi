@@ -12,6 +12,7 @@ import {
   publisher,
 } from "../realtime/publisher";
 import { authP } from "./base";
+import { deleteRoomsByKindOwner } from "./roomAccess";
 import {
   assertBoardAccess,
   assertCardAccess,
@@ -24,13 +25,8 @@ import {
  *  messages + reactions). A card's discussion thread is a 'card'-kind room
  *  with no FK on owner_id, so card owners call this from their delete paths
  *  (currently archive.purge). */
-export async function deleteCardRooms(cardIds: string[]) {
-  if (cardIds.length === 0) return;
-  await db
-    .deleteFrom("chat_rooms")
-    .where("kind", "=", "card")
-    .where("owner_id", "in", cardIds)
-    .execute();
+export function deleteCardRooms(cardIds: string[]) {
+  return deleteRoomsByKindOwner("card", cardIds);
 }
 
 /** Kanban boards, scoped to teams: a user only sees/touches boards of teams

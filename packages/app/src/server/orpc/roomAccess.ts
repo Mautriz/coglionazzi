@@ -85,6 +85,23 @@ export async function resolveRoom(ref: RoomRef): Promise<RoomRow> {
   return row;
 }
 
+/** Delete chat rooms by kind + owner(s) — the explicit cleanup for kinds whose
+ *  `owner_id` has no FK (`card`/`team`/`game`), so a cascade off the owning
+ *  table would orphan them. Messages/reactions cascade off the room FK. No-ops
+ *  on an empty id list. */
+export async function deleteRoomsByKindOwner(
+  kind: string,
+  owners: string | readonly string[],
+): Promise<void> {
+  const ids = typeof owners === "string" ? [owners] : owners;
+  if (ids.length === 0) return;
+  await db
+    .deleteFrom("chat_rooms")
+    .where("kind", "=", kind)
+    .where("owner_id", "in", ids)
+    .execute();
+}
+
 async function getRoom(roomId: string): Promise<RoomRow> {
   const room = await db
     .selectFrom("chat_rooms")
