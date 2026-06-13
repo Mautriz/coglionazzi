@@ -221,17 +221,19 @@ function BoardFilters({ boardId }: { boardId: string }) {
 
       <div className="flex flex-col gap-1.5 px-1">
         <Label className="text-xs text-muted-foreground">Created</Label>
-        <div className="flex items-center gap-1.5">
+        {/* Stacked — two pickers + arrow don't fit the narrow rail. */}
+        <div className="flex flex-col gap-1.5">
           <DatePicker
             value={search.from}
             onChange={(v) => patch({ from: v })}
-            placeholder="From"
+            placeholder="From date"
+            className="w-full"
           />
-          <span className="text-xs text-muted-foreground2">→</span>
           <DatePicker
             value={search.to}
             onChange={(v) => patch({ to: v })}
-            placeholder="To"
+            placeholder="To date"
+            className="w-full"
           />
         </div>
       </div>
