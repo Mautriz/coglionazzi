@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { MoonIcon, SunIcon } from "lucide-react";
 import { Logo } from "~/components/custom/Logo";
+import { SearchBox } from "~/components/custom/SearchBox";
 import { Button } from "~/components/ui/button";
 import { authClient } from "~/lib/authClient";
 import { toggleTheme, useTheme } from "~/lib/theme";
@@ -64,7 +65,8 @@ function RouteComponent() {
             ))}
           </nav>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-1 items-center justify-end gap-2">
+          <SearchBox />
           <Button variant="ghost" size="icon" onClick={toggleTheme}>
             {theme === "dark" ? <SunIcon /> : <MoonIcon />}
           </Button>

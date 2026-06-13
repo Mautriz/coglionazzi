@@ -87,6 +87,8 @@ export interface Cards {
   title: string;
   /** Serialized Lexical editor state (JSON). */
   description: unknown | null;
+  /** Plain text extracted from `description` — search only. */
+  description_text: Generated<string>;
   tags: Generated<string[]>;
   position: number;
   created_by: string | null;
@@ -100,6 +102,8 @@ export interface Comments {
   entity_id: string;
   /** Serialized Lexical editor state (JSON). */
   body: unknown;
+  /** Plain text extracted from `body` — search only. */
+  body_text: Generated<string>;
   created_by: string | null;
   created_at: Generated<Timestamp>;
 }

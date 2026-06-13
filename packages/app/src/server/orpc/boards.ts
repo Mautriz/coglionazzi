@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { db } from "../db";
 import { fileUrl, type FileMetadata } from "../files";
+import { extractLexicalText } from "../lexicalText";
 import { authP } from "./base";
 import type { CommentEntityType } from "./comments";
 
@@ -237,6 +238,7 @@ export const boardRouter = {
           ...(patch.title !== undefined && { title: patch.title }),
           ...(patch.description !== undefined && {
             description: patch.description,
+            description_text: extractLexicalText(patch.description),
           }),
           ...(patch.tags !== undefined && { tags: patch.tags }),
         })

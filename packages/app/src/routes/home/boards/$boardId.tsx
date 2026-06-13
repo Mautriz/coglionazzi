@@ -21,7 +21,8 @@ import {
 } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { MessageSquareIcon, PaperclipIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { z } from "zod";
 import { CardDialog } from "~/components/boards/CardDialog";
 import { TagBadge } from "~/components/boards/TagBadge";
 import { Button } from "~/components/ui/button";
@@ -31,6 +32,8 @@ import { cn } from "~/lib/classUtils";
 
 export const Route = createFileRoute("/home/boards/$boardId")({
   component: RouteComponent,
+  // ?card=<id> opens that card's dialog — used by global search results.
+  validateSearch: z.object({ card: z.string().optional() }),
   loader: ({ context, params }) =>
     context.queryClient.ensureQueryData(
       rpc.board.get.queryOptions({ input: { boardId: params.boardId } }),
@@ -66,6 +69,16 @@ function RouteComponent() {
 
   const [openCardId, setOpenCardId] = useState<string | null>(null);
   const [activeCard, setActiveCard] = useState<BoardCard | null>(null);
+
+  // Search results deep-link to a card via ?card=; consume the param into
+  // local state (and drop it from the URL once handled).
+  const { card: cardParam } = Route.useSearch();
+  useEffect(() => {
+    if (cardParam) {
+      setOpenCardId(cardParam);
+      navigate({ search: {}, replace: true });
+    }
+  }, [cardParam, navigate]);
 
   // A plain click must still open the card dialog — only start dragging
   // after the pointer travelled a bit.

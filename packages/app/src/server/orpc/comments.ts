@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { db } from "../db";
+import { extractLexicalText } from "../lexicalText";
 import { authP } from "./base";
 
 /** Every commentable entity kind. Extend this enum (and clean up comments in
@@ -49,6 +50,7 @@ export const commentRouter = {
           entity_type: info.input.entityType,
           entity_id: info.input.entityId,
           body: info.input.body,
+          body_text: extractLexicalText(info.input.body),
           created_by: info.context.user.id,
         })
         .returning("id")

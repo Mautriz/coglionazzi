@@ -10,6 +10,7 @@ import {
 import { authP, getAuthSession, t } from "./base";
 import { boardRouter } from "./boards";
 import { commentRouter } from "./comments";
+import { searchRouter } from "./search";
 
 export const appRouter = {
   file: {
@@ -82,6 +83,7 @@ export const appRouter = {
   },
   board: boardRouter,
   comment: commentRouter,
+  search: searchRouter,
   auth: {
     getSession: t.handler(async (info) => {
       if (!info.context.reqHeaders) {
