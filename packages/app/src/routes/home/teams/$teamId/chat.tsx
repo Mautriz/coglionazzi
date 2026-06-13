@@ -4,7 +4,7 @@ import { MessagesSquareIcon } from "lucide-react";
 import { MessageThread } from "~/components/custom/MessageThread";
 import { rpc } from "~/lib/rpcClient";
 
-export const Route = createFileRoute("/home/boards/chat/$teamId")({
+export const Route = createFileRoute("/home/teams/$teamId/chat")({
   component: RouteComponent,
   // Open (find-or-create) the team room up front so non-members are bounced
   // before the view renders.
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/home/boards/chat/$teamId")({
     } catch (err) {
       const code = (err as { code?: string } | null)?.code;
       if (code === "FORBIDDEN" || code === "NOT_FOUND") {
-        throw redirect({ to: "/home/boards" });
+        throw redirect({ to: "/home" });
       }
       throw err;
     }

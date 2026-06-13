@@ -13,18 +13,12 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 import { ArchivedCardDialog } from "~/components/boards/ArchivedCardDialog";
-import { CardFiltersPanel } from "~/components/boards/CardFiltersPanel";
 import { TagBadge } from "~/components/boards/TagBadge";
 import { UserAvatar } from "~/components/custom/UserAvatar";
-import {
-  cardMatchesFilters,
-  isFilterActive,
-  mergeFilters,
-  type CardFilters,
-} from "~/lib/cardFilters";
+import { cardMatchesFilters, isFilterActive } from "~/lib/cardFilters";
 import { rpc } from "~/lib/rpcClient";
 
-export const Route = createFileRoute("/home/boards/archive/$teamId")({
+export const Route = createFileRoute("/home/teams/$teamId/archive")({
   component: RouteComponent,
   // Same filter params as the board view (kept in the URL so filtered archive
   // views are shareable); `card` opens a specific archived card.
@@ -44,7 +38,7 @@ export const Route = createFileRoute("/home/boards/archive/$teamId")({
     } catch (err) {
       const code = (err as { code?: string } | null)?.code;
       if (code === "FORBIDDEN" || code === "NOT_FOUND") {
-        throw redirect({ to: "/home/boards" });
+        throw redirect({ to: "/home" });
       }
       throw err;
     }
@@ -53,7 +47,6 @@ export const Route = createFileRoute("/home/boards/archive/$teamId")({
 
 function RouteComponent() {
   const { teamId } = Route.useParams();
-  const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
 
   const listQuery = rpc.archive.list.queryOptions({ input: { teamId } });
@@ -72,14 +65,6 @@ function RouteComponent() {
 
   const openCard = cards.find((c) => c.id === openCardId) ?? null;
 
-  const patch = (p: Partial<CardFilters>) =>
-    navigate({
-      to: "/home/boards/archive/$teamId",
-      params: { teamId },
-      search: (prev) => mergeFilters(prev, p),
-      replace: true,
-    });
-
   return (
     <main className="flex w-full flex-1 flex-col gap-5 p-4 py-6">
       <div className="flex items-baseline gap-3">
@@ -96,14 +81,6 @@ function RouteComponent() {
             : `${cards.length} card${cards.length === 1 ? "" : "s"}`}
         </span>
       </div>
-
-      {/* Same filters as a board, laid out horizontally (see CardFiltersPanel). */}
-      <CardFiltersPanel
-        layout="bar"
-        filters={filters}
-        teamId={teamId}
-        onPatch={patch}
-      />
 
       {visible.length === 0 ? (
         <p className="mt-8 text-center text-sm text-muted-foreground">

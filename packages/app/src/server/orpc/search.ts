@@ -56,7 +56,12 @@ export const searchRouter = {
           .selectFrom("boards")
           .where("boards.team_id", "in", teamIds)
           .where(matches(q, "boards.name"))
-          .select(["id", "name", rank(q, "boards.name").as("rank")])
+          .select([
+            "id",
+            "name",
+            "team_id as teamId",
+            rank(q, "boards.name").as("rank"),
+          ])
           .orderBy("rank", "desc")
           .limit(LIMIT_PER_KIND)
           .execute(),
@@ -79,6 +84,7 @@ export const searchRouter = {
             "cards.description_text",
             "boards.id as boardId",
             "boards.name as boardName",
+            "boards.team_id as teamId",
             sql<number>`greatest(${rank(q, "cards.title")}, ${rank(q, "cards.description_text")})`.as(
               "rank",
             ),
@@ -106,6 +112,7 @@ export const searchRouter = {
             "cards.title as cardTitle",
             "boards.id as boardId",
             "boards.name as boardName",
+            "boards.team_id as teamId",
             "users.name as author",
             rank(q, "chat_messages.body_text").as("rank"),
           ])
@@ -115,12 +122,13 @@ export const searchRouter = {
       ]);
 
       return {
-        boards: boards.map((b) => ({ id: b.id, name: b.name })),
+        boards: boards.map((b) => ({ id: b.id, name: b.name, teamId: b.teamId })),
         cards: cards.map((c) => ({
           id: c.id,
           title: c.title,
           boardId: c.boardId,
           boardName: c.boardName,
+          teamId: c.teamId,
           snippet: snippet(c.description_text, q),
         })),
         comments: comments.map((c) => ({
@@ -129,6 +137,7 @@ export const searchRouter = {
           cardTitle: c.cardTitle,
           boardId: c.boardId,
           boardName: c.boardName,
+          teamId: c.teamId,
           author: c.author,
           snippet: snippet(c.body_text, q),
         })),

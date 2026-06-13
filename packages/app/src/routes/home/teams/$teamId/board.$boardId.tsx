@@ -41,7 +41,7 @@ import { Input } from "~/components/ui/input";
 import { rpc, type Outputs } from "~/lib/rpcClient";
 import { cn } from "~/lib/classUtils";
 
-export const Route = createFileRoute("/home/boards/$boardId")({
+export const Route = createFileRoute("/home/teams/$teamId/board/$boardId")({
   component: RouteComponent,
   // ?card=<id> opens that card's dialog (used by global search results);
   // the rest are the board filters (see lib/cardFilters.ts), kept in the
@@ -61,10 +61,13 @@ export const Route = createFileRoute("/home/boards/$boardId")({
       );
     } catch (err) {
       // Not a member of the board's team (or the board is gone) → send the
-      // user back to the boards list instead of an error page.
+      // user back to the team landing instead of an error page.
       const code = (err as { code?: string } | null)?.code;
       if (code === "FORBIDDEN" || code === "NOT_FOUND") {
-        throw redirect({ to: "/home/boards" });
+        throw redirect({
+          to: "/home/teams/$teamId",
+          params: { teamId: params.teamId },
+        });
       }
       throw err;
     }
@@ -75,7 +78,7 @@ type Board = Outputs["board"]["get"];
 type BoardCard = Board["columns"][number]["cards"][number];
 
 function RouteComponent() {
-  const { boardId } = Route.useParams();
+  const { teamId, boardId } = Route.useParams();
   const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
 
@@ -103,7 +106,7 @@ function RouteComponent() {
     rpc.board.deleteBoard.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: rpc.board.list.key() });
-        navigate({ to: "/home/boards" });
+        navigate({ to: "/home/teams/$teamId", params: { teamId } });
       },
     }),
   );

@@ -37,12 +37,12 @@ export function SearchBox() {
     !!results &&
     results.boards.length + results.cards.length + results.comments.length > 0;
 
-  function go(boardId: string, cardId?: string) {
+  function go(teamId: string, boardId: string, cardId?: string) {
     setOpen(false);
     setQuery("");
     navigate({
-      to: "/home/boards/$boardId",
-      params: { boardId },
+      to: "/home/teams/$teamId/board/$boardId",
+      params: { teamId, boardId },
       search: cardId ? { card: cardId } : {},
     });
   }
@@ -84,7 +84,7 @@ export function SearchBox() {
               icon={<KanbanIcon className="size-3.5 shrink-0 text-primary" />}
               title={board.name}
               subtitle="Board"
-              onPick={() => go(board.id)}
+              onPick={() => go(board.teamId, board.id)}
             />
           ))}
 
@@ -94,7 +94,7 @@ export function SearchBox() {
               icon={<SquareIcon className="size-3.5 shrink-0 text-primary" />}
               title={card.title}
               subtitle={`${card.boardName}${card.snippet ? ` — ${card.snippet}` : ""}`}
-              onPick={() => go(card.boardId, card.id)}
+              onPick={() => go(card.teamId, card.boardId, card.id)}
             />
           ))}
 
@@ -106,7 +106,7 @@ export function SearchBox() {
               }
               title={`${comment.author ?? "ghost"} on "${comment.cardTitle}"`}
               subtitle={comment.snippet}
-              onPick={() => go(comment.boardId, comment.cardId)}
+              onPick={() => go(comment.teamId, comment.boardId, comment.cardId)}
             />
           ))}
         </div>

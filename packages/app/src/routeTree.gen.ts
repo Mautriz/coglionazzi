@@ -17,13 +17,13 @@ import { Route as HomeDemoRouteImport } from './routes/home/demo'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
-import { Route as HomeBoardsRouteRouteImport } from './routes/home/boards/route'
-import { Route as HomeBoardsIndexRouteImport } from './routes/home/boards/index'
-import { Route as HomeBoardsBoardIdRouteImport } from './routes/home/boards/$boardId'
 import { Route as ApiRpcSplatRouteImport } from './routes/api/rpc/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
-import { Route as HomeBoardsChatTeamIdRouteImport } from './routes/home/boards/chat.$teamId'
-import { Route as HomeBoardsArchiveTeamIdRouteImport } from './routes/home/boards/archive.$teamId'
+import { Route as HomeTeamsTeamIdRouteRouteImport } from './routes/home/teams/$teamId/route'
+import { Route as HomeTeamsTeamIdIndexRouteImport } from './routes/home/teams/$teamId/index'
+import { Route as HomeTeamsTeamIdChatRouteImport } from './routes/home/teams/$teamId/chat'
+import { Route as HomeTeamsTeamIdArchiveRouteImport } from './routes/home/teams/$teamId/archive'
+import { Route as HomeTeamsTeamIdBoardBoardIdRouteImport } from './routes/home/teams/$teamId/board.$boardId'
 
 const HomeRouteRoute = HomeRouteRouteImport.update({
   id: '/home',
@@ -65,21 +65,6 @@ const ApiFilesRoute = ApiFilesRouteImport.update({
   path: '/api/files',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HomeBoardsRouteRoute = HomeBoardsRouteRouteImport.update({
-  id: '/boards',
-  path: '/boards',
-  getParentRoute: () => HomeRouteRoute,
-} as any)
-const HomeBoardsIndexRoute = HomeBoardsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => HomeBoardsRouteRoute,
-} as any)
-const HomeBoardsBoardIdRoute = HomeBoardsBoardIdRouteImport.update({
-  id: '/$boardId',
-  path: '/$boardId',
-  getParentRoute: () => HomeBoardsRouteRoute,
-} as any)
 const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
   id: '/api/rpc/$',
   path: '/api/rpc/$',
@@ -90,33 +75,49 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HomeBoardsChatTeamIdRoute = HomeBoardsChatTeamIdRouteImport.update({
-  id: '/chat/$teamId',
-  path: '/chat/$teamId',
-  getParentRoute: () => HomeBoardsRouteRoute,
+const HomeTeamsTeamIdRouteRoute = HomeTeamsTeamIdRouteRouteImport.update({
+  id: '/teams/$teamId',
+  path: '/teams/$teamId',
+  getParentRoute: () => HomeRouteRoute,
 } as any)
-const HomeBoardsArchiveTeamIdRoute = HomeBoardsArchiveTeamIdRouteImport.update({
-  id: '/archive/$teamId',
-  path: '/archive/$teamId',
-  getParentRoute: () => HomeBoardsRouteRoute,
+const HomeTeamsTeamIdIndexRoute = HomeTeamsTeamIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => HomeTeamsTeamIdRouteRoute,
 } as any)
+const HomeTeamsTeamIdChatRoute = HomeTeamsTeamIdChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => HomeTeamsTeamIdRouteRoute,
+} as any)
+const HomeTeamsTeamIdArchiveRoute = HomeTeamsTeamIdArchiveRouteImport.update({
+  id: '/archive',
+  path: '/archive',
+  getParentRoute: () => HomeTeamsTeamIdRouteRoute,
+} as any)
+const HomeTeamsTeamIdBoardBoardIdRoute =
+  HomeTeamsTeamIdBoardBoardIdRouteImport.update({
+    id: '/board/$boardId',
+    path: '/board/$boardId',
+    getParentRoute: () => HomeTeamsTeamIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
   '/home': typeof HomeRouteRouteWithChildren
-  '/home/boards': typeof HomeBoardsRouteRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/home/demo': typeof HomeDemoRoute
   '/home/': typeof HomeIndexRoute
+  '/home/teams/$teamId': typeof HomeTeamsTeamIdRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
-  '/home/boards/$boardId': typeof HomeBoardsBoardIdRoute
-  '/home/boards/': typeof HomeBoardsIndexRoute
-  '/home/boards/archive/$teamId': typeof HomeBoardsArchiveTeamIdRoute
-  '/home/boards/chat/$teamId': typeof HomeBoardsChatTeamIdRoute
+  '/home/teams/$teamId/archive': typeof HomeTeamsTeamIdArchiveRoute
+  '/home/teams/$teamId/chat': typeof HomeTeamsTeamIdChatRoute
+  '/home/teams/$teamId/': typeof HomeTeamsTeamIdIndexRoute
+  '/home/teams/$teamId/board/$boardId': typeof HomeTeamsTeamIdBoardBoardIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -128,28 +129,28 @@ export interface FileRoutesByTo {
   '/home': typeof HomeIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
-  '/home/boards/$boardId': typeof HomeBoardsBoardIdRoute
-  '/home/boards': typeof HomeBoardsIndexRoute
-  '/home/boards/archive/$teamId': typeof HomeBoardsArchiveTeamIdRoute
-  '/home/boards/chat/$teamId': typeof HomeBoardsChatTeamIdRoute
+  '/home/teams/$teamId/archive': typeof HomeTeamsTeamIdArchiveRoute
+  '/home/teams/$teamId/chat': typeof HomeTeamsTeamIdChatRoute
+  '/home/teams/$teamId': typeof HomeTeamsTeamIdIndexRoute
+  '/home/teams/$teamId/board/$boardId': typeof HomeTeamsTeamIdBoardBoardIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
   '/home': typeof HomeRouteRouteWithChildren
-  '/home/boards': typeof HomeBoardsRouteRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/home/demo': typeof HomeDemoRoute
   '/home/': typeof HomeIndexRoute
+  '/home/teams/$teamId': typeof HomeTeamsTeamIdRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
-  '/home/boards/$boardId': typeof HomeBoardsBoardIdRoute
-  '/home/boards/': typeof HomeBoardsIndexRoute
-  '/home/boards/archive/$teamId': typeof HomeBoardsArchiveTeamIdRoute
-  '/home/boards/chat/$teamId': typeof HomeBoardsChatTeamIdRoute
+  '/home/teams/$teamId/archive': typeof HomeTeamsTeamIdArchiveRoute
+  '/home/teams/$teamId/chat': typeof HomeTeamsTeamIdChatRoute
+  '/home/teams/$teamId/': typeof HomeTeamsTeamIdIndexRoute
+  '/home/teams/$teamId/board/$boardId': typeof HomeTeamsTeamIdBoardBoardIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -157,18 +158,18 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/home'
-    | '/home/boards'
     | '/api/files'
     | '/auth/login'
     | '/auth/sign-up'
     | '/home/demo'
     | '/home/'
+    | '/home/teams/$teamId'
     | '/api/auth/$'
     | '/api/rpc/$'
-    | '/home/boards/$boardId'
-    | '/home/boards/'
-    | '/home/boards/archive/$teamId'
-    | '/home/boards/chat/$teamId'
+    | '/home/teams/$teamId/archive'
+    | '/home/teams/$teamId/chat'
+    | '/home/teams/$teamId/'
+    | '/home/teams/$teamId/board/$boardId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -180,27 +181,27 @@ export interface FileRouteTypes {
     | '/home'
     | '/api/auth/$'
     | '/api/rpc/$'
-    | '/home/boards/$boardId'
-    | '/home/boards'
-    | '/home/boards/archive/$teamId'
-    | '/home/boards/chat/$teamId'
+    | '/home/teams/$teamId/archive'
+    | '/home/teams/$teamId/chat'
+    | '/home/teams/$teamId'
+    | '/home/teams/$teamId/board/$boardId'
   id:
     | '__root__'
     | '/'
     | '/auth'
     | '/home'
-    | '/home/boards'
     | '/api/files'
     | '/auth/login'
     | '/auth/sign-up'
     | '/home/demo'
     | '/home/'
+    | '/home/teams/$teamId'
     | '/api/auth/$'
     | '/api/rpc/$'
-    | '/home/boards/$boardId'
-    | '/home/boards/'
-    | '/home/boards/archive/$teamId'
-    | '/home/boards/chat/$teamId'
+    | '/home/teams/$teamId/archive'
+    | '/home/teams/$teamId/chat'
+    | '/home/teams/$teamId/'
+    | '/home/teams/$teamId/board/$boardId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -270,27 +271,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFilesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/home/boards': {
-      id: '/home/boards'
-      path: '/boards'
-      fullPath: '/home/boards'
-      preLoaderRoute: typeof HomeBoardsRouteRouteImport
-      parentRoute: typeof HomeRouteRoute
-    }
-    '/home/boards/': {
-      id: '/home/boards/'
-      path: '/'
-      fullPath: '/home/boards/'
-      preLoaderRoute: typeof HomeBoardsIndexRouteImport
-      parentRoute: typeof HomeBoardsRouteRoute
-    }
-    '/home/boards/$boardId': {
-      id: '/home/boards/$boardId'
-      path: '/$boardId'
-      fullPath: '/home/boards/$boardId'
-      preLoaderRoute: typeof HomeBoardsBoardIdRouteImport
-      parentRoute: typeof HomeBoardsRouteRoute
-    }
     '/api/rpc/$': {
       id: '/api/rpc/$'
       path: '/api/rpc/$'
@@ -305,19 +285,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/home/boards/chat/$teamId': {
-      id: '/home/boards/chat/$teamId'
-      path: '/chat/$teamId'
-      fullPath: '/home/boards/chat/$teamId'
-      preLoaderRoute: typeof HomeBoardsChatTeamIdRouteImport
-      parentRoute: typeof HomeBoardsRouteRoute
+    '/home/teams/$teamId': {
+      id: '/home/teams/$teamId'
+      path: '/teams/$teamId'
+      fullPath: '/home/teams/$teamId'
+      preLoaderRoute: typeof HomeTeamsTeamIdRouteRouteImport
+      parentRoute: typeof HomeRouteRoute
     }
-    '/home/boards/archive/$teamId': {
-      id: '/home/boards/archive/$teamId'
-      path: '/archive/$teamId'
-      fullPath: '/home/boards/archive/$teamId'
-      preLoaderRoute: typeof HomeBoardsArchiveTeamIdRouteImport
-      parentRoute: typeof HomeBoardsRouteRoute
+    '/home/teams/$teamId/': {
+      id: '/home/teams/$teamId/'
+      path: '/'
+      fullPath: '/home/teams/$teamId/'
+      preLoaderRoute: typeof HomeTeamsTeamIdIndexRouteImport
+      parentRoute: typeof HomeTeamsTeamIdRouteRoute
+    }
+    '/home/teams/$teamId/chat': {
+      id: '/home/teams/$teamId/chat'
+      path: '/chat'
+      fullPath: '/home/teams/$teamId/chat'
+      preLoaderRoute: typeof HomeTeamsTeamIdChatRouteImport
+      parentRoute: typeof HomeTeamsTeamIdRouteRoute
+    }
+    '/home/teams/$teamId/archive': {
+      id: '/home/teams/$teamId/archive'
+      path: '/archive'
+      fullPath: '/home/teams/$teamId/archive'
+      preLoaderRoute: typeof HomeTeamsTeamIdArchiveRouteImport
+      parentRoute: typeof HomeTeamsTeamIdRouteRoute
+    }
+    '/home/teams/$teamId/board/$boardId': {
+      id: '/home/teams/$teamId/board/$boardId'
+      path: '/board/$boardId'
+      fullPath: '/home/teams/$teamId/board/$boardId'
+      preLoaderRoute: typeof HomeTeamsTeamIdBoardBoardIdRouteImport
+      parentRoute: typeof HomeTeamsTeamIdRouteRoute
     }
   }
 }
@@ -336,34 +337,33 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
   AuthRouteRouteChildren,
 )
 
-interface HomeBoardsRouteRouteChildren {
-  HomeBoardsBoardIdRoute: typeof HomeBoardsBoardIdRoute
-  HomeBoardsIndexRoute: typeof HomeBoardsIndexRoute
-  HomeBoardsArchiveTeamIdRoute: typeof HomeBoardsArchiveTeamIdRoute
-  HomeBoardsChatTeamIdRoute: typeof HomeBoardsChatTeamIdRoute
+interface HomeTeamsTeamIdRouteRouteChildren {
+  HomeTeamsTeamIdArchiveRoute: typeof HomeTeamsTeamIdArchiveRoute
+  HomeTeamsTeamIdChatRoute: typeof HomeTeamsTeamIdChatRoute
+  HomeTeamsTeamIdIndexRoute: typeof HomeTeamsTeamIdIndexRoute
+  HomeTeamsTeamIdBoardBoardIdRoute: typeof HomeTeamsTeamIdBoardBoardIdRoute
 }
 
-const HomeBoardsRouteRouteChildren: HomeBoardsRouteRouteChildren = {
-  HomeBoardsBoardIdRoute: HomeBoardsBoardIdRoute,
-  HomeBoardsIndexRoute: HomeBoardsIndexRoute,
-  HomeBoardsArchiveTeamIdRoute: HomeBoardsArchiveTeamIdRoute,
-  HomeBoardsChatTeamIdRoute: HomeBoardsChatTeamIdRoute,
+const HomeTeamsTeamIdRouteRouteChildren: HomeTeamsTeamIdRouteRouteChildren = {
+  HomeTeamsTeamIdArchiveRoute: HomeTeamsTeamIdArchiveRoute,
+  HomeTeamsTeamIdChatRoute: HomeTeamsTeamIdChatRoute,
+  HomeTeamsTeamIdIndexRoute: HomeTeamsTeamIdIndexRoute,
+  HomeTeamsTeamIdBoardBoardIdRoute: HomeTeamsTeamIdBoardBoardIdRoute,
 }
 
-const HomeBoardsRouteRouteWithChildren = HomeBoardsRouteRoute._addFileChildren(
-  HomeBoardsRouteRouteChildren,
-)
+const HomeTeamsTeamIdRouteRouteWithChildren =
+  HomeTeamsTeamIdRouteRoute._addFileChildren(HomeTeamsTeamIdRouteRouteChildren)
 
 interface HomeRouteRouteChildren {
-  HomeBoardsRouteRoute: typeof HomeBoardsRouteRouteWithChildren
   HomeDemoRoute: typeof HomeDemoRoute
   HomeIndexRoute: typeof HomeIndexRoute
+  HomeTeamsTeamIdRouteRoute: typeof HomeTeamsTeamIdRouteRouteWithChildren
 }
 
 const HomeRouteRouteChildren: HomeRouteRouteChildren = {
-  HomeBoardsRouteRoute: HomeBoardsRouteRouteWithChildren,
   HomeDemoRoute: HomeDemoRoute,
   HomeIndexRoute: HomeIndexRoute,
+  HomeTeamsTeamIdRouteRoute: HomeTeamsTeamIdRouteRouteWithChildren,
 }
 
 const HomeRouteRouteWithChildren = HomeRouteRoute._addFileChildren(

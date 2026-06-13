@@ -63,10 +63,12 @@ packages/
         │   ├── __root.tsx         # head, theme init script, session beforeLoad
         │   ├── index.tsx          # redirects to /home or /auth/login
         │   ├── auth/              # public: route.tsx layout + login + sign-up
-        │   ├── home/              # protected: route.tsx = guard + topbar/nav layout
-        │   │   ├── index.tsx      # hub linking to the sections
+        │   ├── home/              # protected: route.tsx = guard + topbar + TeamRail
+        │   │   ├── index.tsx      # landing: teams grid + global chat
         │   │   ├── demo.tsx       # playground: editor + file uploads
-        │   │   └── boards/        # kanban: index list + $boardId board view
+        │   │   └── teams/$teamId/ # a team's workspace (route.tsx = TeamPanel):
+        │   │       │              #   index → first board, board.$boardId,
+        │   │       │              #   chat, archive
         │   └── api/
         │       ├── auth/$.ts      # better-auth handler (GET/POST)
         │       ├── files.ts       # GET ?fileId= → streams an uploaded file
@@ -97,7 +99,8 @@ packages/
         │   └── classUtils.tsx     # cn()
         ├── components/
         │   ├── ui/                # shadcn components (add via shadcn CLI)
-        │   └── custom/            # AppForm, Logo, app-specific components
+        │   ├── teams/             # TeamRail (global bubble rail) + TeamPanel
+        │   └── custom/            # AppForm, Logo, TeamAvatar, app-specific
         └── styles/app.css         # the ONLY Tailwind/theme config (v4 CSS-first)
 ```
 
@@ -257,9 +260,13 @@ Postgres + a `uploads` volume for assets.
   drops the team's chat rooms first (`deleteTeamRooms` — the team room + its
   cards' rooms; no FK on `owner_id`). Membership/board-set changes publish on
   the `team` realtime channel (see Realtime).
-- UI: the boards sidebar (`BoardsSidebar`) groups boards under their team
-  with per-team "Add board" + a "New team" creator; `TeamDialog` manages
-  members/rename/delete/leave. `board.create` takes a `teamId`.
+- UI is team-centric (Discord-shaped): a global `<TeamRail>` of team "bubbles"
+  (far-left, in the `/home` shell) switches teams; selecting one opens its
+  `<TeamPanel>` (second column) with that team's boards (+ inline "Add board"),
+  Chat, Archive and a stubbed Games slot. `<TeamAvatar>` = square hash-colored
+  initials (the team sibling of round `<UserAvatar>`). `TeamDialog` (gear in the
+  panel header) manages members/rename/delete/leave; new teams are created from
+  the rail's `+` or the home teams grid. `board.create` takes a `teamId`.
   Card assignee pickers + the assignee filter are scoped to the board's
   team via `<AssigneeCombobox teamId=…>` (uses `rpc.team.members`).
 - Migration `1770000000006_teams` backfilled all pre-teams data into one
@@ -292,7 +299,7 @@ Postgres + a `uploads` volume for assets.
   invalidates that one query after any mutation.
 - Ordering uses float positions: the client computes midpoint-of-neighbors
   and sends it to `moveCard`/`moveColumn` (omitted position = append at
-  end). Drag & drop is @dnd-kit in `routes/home/boards/$boardId.tsx`: a
+  end). Drag & drop is @dnd-kit in `routes/home/teams/$teamId/board.$boardId.tsx`: a
   horizontal `SortableContext` of columns wraps per-column vertical
   `SortableContext`s of cards (one `DndContext`). Items carry
   `data.type: 'column' | 'card'`; `handleDragEnd` branches on it. Each
@@ -308,20 +315,21 @@ Postgres + a `uploads` volume for assets.
   via the upload helpers, a `<MessageThread>` card discussion at the bottom —
   see Chat rooms & messages). Archiving a card KEEPS its room/messages; only
   `archive.purge` deletes them (`deleteCardRooms`).
-- The boards section has its own left sidebar
-  (`~/components/boards/BoardsSidebar`, rendered under the global topbar by
-  `routes/home/boards/route.tsx`): the global `<SearchBox>` (boards-only —
-  it is NOT in the shared topbar), board list + inline create, and — when a
-  board is open — the filters. The global topbar/nav (Home/Boards/Demo)
-  stays on every page; `UserActions` (theme + logout) is shared.
-- Filtering is client-side over the already-loaded board: pure functions in
-  `~/lib/cardFilters.ts` (`cardMatchesFilters`, `isFilterActive`,
-  `mergeFilters` = merge a patch + drop emptied keys) over the board route's
+- Navigation chrome: the global topbar (Logo → Home, Demo link, `UserActions`
+  = theme + logout) sits above everything; the `<TeamRail>` (team bubbles) is
+  in the `/home` shell; the `<TeamPanel>` (its second column) is added by
+  `routes/home/teams/$teamId/route.tsx`. The panel holds the global
+  `<SearchBox>` (deliberately NOT in the shared topbar), the team's boards +
+  spaces, and — when a board OR the archive is open — that view's filters.
+- Filtering is client-side over the already-loaded board/archive: pure
+  functions in `~/lib/cardFilters.ts` (`cardMatchesFilters`, `isFilterActive`,
+  `mergeFilters` = merge a patch + drop emptied keys) over the active route's
   search params (`q`, `tags`, `assignees`, `from`, `to`) — kept in the URL so
   filtered views are shareable. The filter UI is ONE shared component,
-  `<CardFiltersPanel layout="rail"|"bar">` (`~/components/boards/`), used by
-  both the board sidebar (`rail` = stacked) and the archive page (`bar` =
-  horizontal); parent owns the search-param state and passes `onPatch`. Date
+  `<CardFiltersPanel>` (`~/components/boards/`), rendered in the team panel for
+  BOTH the board and archive views (same place, same stacked layout — unified);
+  the panel owns the search-param wiring (`onPatch` targets the active route).
+  Date
   range compares UTC calendar days (inclusive); the UI uses `<DatePicker>`
   (popover +
   shadcn `Calendar`/react-day-picker). `<AssigneeCombobox>` (popover +
@@ -357,11 +365,11 @@ Postgres + a `uploads` volume for assets.
   `boards.ts` is the shared card-nesting helper (`liveRelationsOnly` toggles
   whether archived counterparts show in relations) used by `board.get` and
   `archive.list`.
-- UI: the boards sidebar has an "Archive" entry per team →
-  `routes/home/boards/archive.$teamId.tsx`, a list view (not columns) reusing
-  `cardFilters` with the same URL search params as the board. Rows open
-  `<ArchivedCardDialog>`: read-only fields + an active comment thread, footer
-  = Restore / Delete forever.
+- UI: the team panel has an "Archive" space →
+  `routes/home/teams/$teamId/archive.tsx`, a list view (not columns) reusing
+  `cardFilters` with the same URL search params as the board (its filters
+  render in the panel, see Kanban). Rows open `<ArchivedCardDialog>`: read-only
+  fields + an active comment thread, footer = Restore / Delete forever.
 
 ### Chat rooms & messages (the generic message model)
 
@@ -395,8 +403,9 @@ Postgres + a `uploads` volume for assets.
   section. It composes the shared `<MessageComposer>` (⌘/Ctrl+Enter to send,
   NEVER bare Enter), `<MessageItem>` (body + reactions + author edit/delete),
   and `useChatRoom` (`lib/useChatRoom.ts`) which seeds from `chat.open`,
-  streams live (see Realtime), and pages history. The Chat nav section
-  (`routes/home/chat.tsx`) lists Global + each team's room.
+  streams live (see Realtime), and pages history. The global room is on the
+  home page (`routes/home/index.tsx`); each team's room is the Chat space in
+  its panel (`routes/home/teams/$teamId/chat.tsx`).
 - Gotcha: jsonb columns come back from pg as parsed objects — serialize
   with `JSON.stringify` when returning editor states to the client (the
   editor's `initialState` wants the string).
@@ -410,8 +419,9 @@ Postgres + a `uploads` volume for assets.
   columns (`cards.description_text`, `chat_messages.body_text`). New rich-text
   fields that should be searchable need the same companion column +
   trigram index + write-path extraction.
-- UI: `<SearchBox />` in the /home topbar; card/message results deep-link
-  via the board route's `?card=` param.
+- UI: `<SearchBox />` lives in the team panel (`<TeamPanel>`); results carry a
+  `teamId` and deep-link to the team-scoped board route, card/message hits via
+  its `?card=` param.
 
 ### Realtime (WebSockets)
 
