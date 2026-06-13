@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { ArchiveIcon, ArrowLeftIcon, ArrowRightIcon, LinkIcon, XIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AssigneeCombobox } from "~/components/custom/AssigneeCombobox";
 import { TagCombobox } from "~/components/custom/TagCombobox";
@@ -62,19 +62,45 @@ export function CardDialog({
   const [assigneeIds, setAssigneeIds] = useState(
     card.assignees.map((a) => a.id),
   );
-  // Description JSON is captured on every editor change but only persisted
-  // on Save, like the rest of the card.
   const descriptionRef = useRef<string | null>(card.description);
 
   const { mutate: updateCard, isPending: isSaving } = useMutation(
-    rpc.board.updateCard.mutationOptions({
-      onSuccess: () => {
-        onChanged();
-        toast.success("Card saved");
-        onClose();
-      },
-    }),
+    // Auto-save: persist a single field and refresh the board behind the
+    // dialog (which stays open). Partial input — see board.updateCard.
+    rpc.board.updateCard.mutationOptions({ onSuccess: onChanged }),
   );
+
+  // Title & description are debounced (text fields); tags/assignees/relations/
+  // attachments save immediately. Pending debounced fields are flushed when the
+  // dialog closes, so nothing typed in the last 2s is lost.
+  const pending = useRef<{ title?: string; description?: string | null }>({});
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function flush() {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    const patch = pending.current;
+    pending.current = {};
+    // Never persist an empty title (the column header would go blank).
+    if (patch.title !== undefined && !patch.title.trim()) delete patch.title;
+    if (Object.keys(patch).length > 0) updateCard({ cardId: card.id, ...patch });
+  }
+
+  function scheduleSave(patch: { title?: string; description?: string | null }) {
+    pending.current = { ...pending.current, ...patch };
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(flush, 2000);
+  }
+
+  // Flush on unmount so a fast close still saves the last edits.
+  useEffect(() => () => flush(), []);
+
+  function close() {
+    flush();
+    onClose();
+  }
 
   const { mutate: archiveCard, isPending: isArchiving } = useMutation(
     rpc.board.archiveCard.mutationOptions({
@@ -109,29 +135,22 @@ export function CardDialog({
       c.id !== card.id && !card.relations.some((r) => r.cardId === c.id),
   );
 
-  function save() {
-    if (!title.trim()) return;
-    updateCard({
-      cardId: card.id,
-      title,
-      tags,
-      assigneeIds,
-      description: descriptionRef.current,
-    });
-  }
-
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="flex max-h-[85dvh] flex-col gap-4 overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="sr-only">Edit card</DialogTitle>
           <Input
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              scheduleSave({ title: e.target.value });
+            }}
+            onBlur={flush}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                save();
+                flush();
               }
             }}
             className="text-lg! font-semibold"
@@ -144,9 +163,12 @@ export function CardDialog({
           <RichTextEditor
             namespace={`card-${card.id}`}
             initialState={card.description ?? undefined}
-            onChange={(json) => (descriptionRef.current = json)}
-            onSubmit={save}
-            placeholder="Details, links, code… (⌘/Ctrl+Enter to save)"
+            onChange={(json) => {
+              descriptionRef.current = json;
+              scheduleSave({ description: json });
+            }}
+            onSubmit={flush}
+            placeholder="Details, links, code… (saves automatically)"
           />
         </div>
 
@@ -154,7 +176,10 @@ export function CardDialog({
           <Label>Assignees</Label>
           <AssigneeCombobox
             selected={assigneeIds}
-            onChange={setAssigneeIds}
+            onChange={(ids) => {
+              setAssigneeIds(ids);
+              updateCard({ cardId: card.id, assigneeIds: ids });
+            }}
             teamId={teamId}
           />
         </div>
@@ -249,7 +274,14 @@ export function CardDialog({
 
         <div className="flex flex-col gap-1.5">
           <Label>Tags</Label>
-          <TagCombobox selected={tags} onChange={setTags} teamId={teamId} />
+          <TagCombobox
+            selected={tags}
+            onChange={(next) => {
+              setTags(next);
+              updateCard({ cardId: card.id, tags: next });
+            }}
+            teamId={teamId}
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -305,21 +337,20 @@ export function CardDialog({
             size="sm"
             className="text-muted-foreground hover:text-foreground"
             disabled={isArchiving}
-            onClick={() => archiveCard({ cardId: card.id })}
+            onClick={() => {
+              flush();
+              archiveCard({ cardId: card.id });
+            }}
           >
             <ArchiveIcon />
             Archive
           </Button>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={!title.trim() || isSaving}
-              onClick={save}
-            >
-              Save
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground2">
+              {isSaving ? "Saving…" : "Changes save automatically"}
+            </span>
+            <Button type="button" onClick={close}>
+              Done
             </Button>
           </div>
         </div>
