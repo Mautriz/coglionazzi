@@ -16,8 +16,8 @@
           y2="64"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0" stop-color="#22D3EE" />
-          <stop offset="1" stop-color="#0E7490" />
+          <stop offset="0" stop-color="#a855f7" />
+          <stop offset="1" stop-color="#7e22ce" />
         </linearGradient>
         <radialGradient id="cog-gloss" cx="0.28" cy="0.22" r="0.9">
           <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.32" />
@@ -32,7 +32,7 @@
           gradientUnits="userSpaceOnUse"
         >
           <stop offset="0" stop-color="#FFFFFF" />
-          <stop offset="1" stop-color="#C7ECF4" />
+          <stop offset="1" stop-color="#ede9fe" />
         </linearGradient>
         <clipPath id="cog-clip">
           <rect x="0" y="0" width="64" height="64" rx="14" />
@@ -55,7 +55,7 @@
           cy="57.5"
           rx="18"
           ry="3.6"
-          fill="#06222B"
+          fill="#1c0f2b"
           fill-opacity="0.16"
         />
 
@@ -71,14 +71,14 @@
         <!-- cowlick — two dorky loops -->
         <path
           d="M28.5 8.5 Q30.5 4.8 33.5 7.6"
-          stroke="#06222B"
+          stroke="#1c0f2b"
           stroke-width="1.7"
           stroke-linecap="round"
           fill="none"
         />
         <path
           d="M34 7.8 Q36.5 5.4 38 8.8"
-          stroke="#06222B"
+          stroke="#1c0f2b"
           stroke-width="1.7"
           stroke-linecap="round"
           fill="none"
@@ -89,36 +89,36 @@
           cx="24.5"
           cy="23"
           r="6.8"
-          fill="#EAF7FB"
+          fill="#f3e8ff"
           fill-opacity="0.5"
-          stroke="#06222B"
+          stroke="#1c0f2b"
           stroke-width="2.7"
         />
         <circle
           cx="39.5"
           cy="23"
           r="6.8"
-          fill="#EAF7FB"
+          fill="#f3e8ff"
           fill-opacity="0.5"
-          stroke="#06222B"
+          stroke="#1c0f2b"
           stroke-width="2.7"
         />
         <path
           d="M31.1 21.8 Q32 20.6 32.9 21.8"
-          stroke="#06222B"
+          stroke="#1c0f2b"
           stroke-width="2.4"
           stroke-linecap="round"
           fill="none"
         />
         <path
           d="M17.9 21.6 L16.4 20.2"
-          stroke="#06222B"
+          stroke="#1c0f2b"
           stroke-width="2.2"
           stroke-linecap="round"
         />
         <path
           d="M46.1 21.6 L47.6 20.2"
-          stroke="#06222B"
+          stroke="#1c0f2b"
           stroke-width="2.2"
           stroke-linecap="round"
         />
@@ -139,8 +139,8 @@
         />
 
         <!-- eyes -->
-        <circle cx="24.7" cy="23.6" r="1.8" fill="#06222B" />
-        <circle cx="39.7" cy="23.6" r="1.8" fill="#06222B" />
+        <circle cx="24.7" cy="23.6" r="1.8" fill="#1c0f2b" />
+        <circle cx="39.7" cy="23.6" r="1.8" fill="#1c0f2b" />
         <circle cx="25.3" cy="23" r="0.6" fill="#FFFFFF" />
         <circle cx="40.3" cy="23" r="0.6" fill="#FFFFFF" />
 
@@ -150,7 +150,7 @@
           cy="29"
           rx="2.6"
           ry="1.5"
-          fill="#67E8F9"
+          fill="#e879f9"
           opacity="0.55"
         />
         <ellipse
@@ -158,14 +158,14 @@
           cy="29"
           rx="2.6"
           ry="1.5"
-          fill="#67E8F9"
+          fill="#e879f9"
           opacity="0.55"
         />
 
         <!-- goofy grin + buck teeth -->
         <path
           d="M27 30.8 Q32 35 37 30.8"
-          stroke="#06222B"
+          stroke="#1c0f2b"
           stroke-width="1.7"
           stroke-linecap="round"
           fill="none"
@@ -177,12 +177,12 @@
           height="3.1"
           rx="0.9"
           fill="#FFFFFF"
-          stroke="#06222B"
+          stroke="#1c0f2b"
           stroke-width="0.9"
         />
         <path
           d="M32 31.8 L32 34.5"
-          stroke="#06222B"
+          stroke="#1c0f2b"
           stroke-width="0.7"
           stroke-linecap="round"
         />
@@ -190,14 +190,14 @@
         <!-- stubby arms reaching the controller -->
         <path
           d="M18.5 45 Q19.5 49.5 24.5 49"
-          stroke="#C7ECF4"
+          stroke="#ede9fe"
           stroke-width="4.6"
           stroke-linecap="round"
           fill="none"
         />
         <path
           d="M45.5 45 Q44.5 49.5 39.5 49"
-          stroke="#C7ECF4"
+          stroke="#ede9fe"
           stroke-width="4.6"
           stroke-linecap="round"
           fill="none"
@@ -210,18 +210,18 @@
           width="17"
           height="8.4"
           rx="4.2"
-          fill="#06222B"
+          fill="#1c0f2b"
         />
         <!-- d-pad -->
         <path
           d="M28 46.6 L28 50.8 M25.9 48.7 L30.1 48.7"
-          stroke="#EAF7FB"
+          stroke="#f3e8ff"
           stroke-width="1.5"
           stroke-linecap="round"
         />
         <!-- buttons -->
-        <circle cx="36.2" cy="47.4" r="1.25" fill="#22D3EE" />
-        <circle cx="38.6" cy="49.8" r="1.25" fill="#67E8F9" />
+        <circle cx="36.2" cy="47.4" r="1.25" fill="#a855f7" />
+        <circle cx="38.6" cy="49.8" r="1.25" fill="#e879f9" />
         <!-- hands gripping the ends -->
         <circle cx="23.6" cy="48.7" r="2.5" fill="url(#cog-skin)" />
         <circle cx="40.4" cy="48.7" r="2.5" fill="url(#cog-skin)" />

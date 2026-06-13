@@ -166,17 +166,23 @@ Postgres + a `uploads` volume for assets.
 ### Styling
 
 - Tailwind v4: there is NO tailwind.config — design tokens live in the
-  `@theme` block of `src/styles/app.css`. Dark ("deep-sea electric cyan")
-  is the default theme; `.light` overrides to the near-white ice-cyan
-  palette. Both follow the PropFirmHub brand from propanalyst.
+  `@theme` block of `src/styles/app.css`. TWO independent axes, both classes
+  on `<html>`: light/dark mode (`light` is the default) × a brand "skin"
+  (`.brand-arcade` | `blurple` | `sunset` | `deepsea` — `arcade`, neon
+  purple, is the default). Each `.<mode>.brand-<x>` block overrides the
+  token vars. Add a brand by adding both its `.dark.brand-x` /
+  `.light.brand-x` blocks AND an entry in `BRANDS` (`lib/theme.ts`).
 - Always use semantic tokens (`bg-card`, `text-muted-foreground`,
-  `text-primary`, `border-border`…), never hardcoded colors, so both themes
-  work.
+  `text-primary`, `border-border`…), never hardcoded colors, so every
+  mode×brand combo works. (Exception: `components/custom/Logo.tsx` bakes the
+  arcade palette into its SVG — update it by hand if the brand identity
+  changes; `public/favicon.svg` is the same artwork, keep them in sync.)
 - Primary filled surfaces (default Button variant) wear the `special`
   utility → brand gradient + readable label. Links use `text-link`.
-- Theme switching: `toggleTheme()` / `useTheme()` from `~/lib/theme`
-  (class on `<html>`, persisted to localStorage, init script in __root
-  prevents flash).
+- Theme + brand switching: `toggleTheme()`/`useTheme()` and
+  `setBrand()`/`useBrand()` from `~/lib/theme` (classes on `<html>`,
+  persisted to localStorage, init script in __root prevents flash).
+  `<BrandPicker>` is the topbar swatch picker.
 - New shadcn components: `npx shadcn@latest add <name>` inside
   `packages/app` (components.json is configured; cn lives at
   `~/lib/classUtils`).

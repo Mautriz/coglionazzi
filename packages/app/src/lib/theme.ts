@@ -9,7 +9,7 @@ export type Brand = "arcade" | "blurple" | "sunset" | "deepsea";
 
 const THEME_KEY = "theme";
 const BRAND_KEY = "brand";
-const DEFAULT_THEME: Theme = "dark";
+const DEFAULT_THEME: Theme = "light";
 const DEFAULT_BRAND: Brand = "arcade";
 
 const BRAND_IDS: Brand[] = ["arcade", "blurple", "sunset", "deepsea"];
