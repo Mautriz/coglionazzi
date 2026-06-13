@@ -5,6 +5,23 @@ whatever we feel like building. Tone is playful; quality bar is real
 (modelled on the `../propanalyst` codebase, which is the reference for all
 patterns used here).
 
+## Keep this file current
+
+**This file is part of the deliverable — update it in the same change.** When
+work alters something documented here, edit CLAUDE.md alongside the code (and
+mention it in the commit). Update when you:
+
+- add/rename/move a notable file, route, oRPC router, table, or env var, or
+  change the repo layout / commands;
+- introduce or change a convention, pattern, or reusable component, or a
+  non-obvious gotcha worth recording;
+- change the stack, deploy setup, or testing approach.
+
+Keep edits tight — document the rule and where it lives, not every detail
+(the code is the source of truth). Skip trivia: routine bug fixes, one-off
+tweaks, or anything already obvious from the code. If a change contradicts
+something written here, fix the stale text rather than leaving both.
+
 ## Stack
 
 | Concern        | Choice                                                          |
