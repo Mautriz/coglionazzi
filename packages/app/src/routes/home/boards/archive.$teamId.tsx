@@ -66,7 +66,6 @@ function RouteComponent() {
     cardParam ?? null,
   );
 
-  const allTags = [...new Set(cards.flatMap((c) => c.tags))].sort();
   const visible = isFilterActive(filters)
     ? cards.filter((c) => cardMatchesFilters(c, filters))
     : cards;
@@ -102,7 +101,6 @@ function RouteComponent() {
       <CardFiltersPanel
         layout="bar"
         filters={filters}
-        allTags={allTags}
         teamId={teamId}
         onPatch={patch}
       />

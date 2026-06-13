@@ -268,17 +268,10 @@ function BoardFilters({ boardId }: { boardId: string }) {
     rpc.board.get.queryOptions({ input: { boardId } }),
   );
 
-  const allTags = [
-    ...new Set(
-      board?.columns.flatMap((col) => col.cards.flatMap((c) => c.tags)) ?? [],
-    ),
-  ].sort();
-
   return (
     <CardFiltersPanel
       layout="rail"
       filters={search}
-      allTags={allTags}
       teamId={board?.team_id}
       onPatch={(patch) =>
         navigate({

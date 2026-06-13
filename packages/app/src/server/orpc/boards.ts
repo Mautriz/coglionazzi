@@ -232,6 +232,21 @@ export const boardRouter = {
     return boards.map((b) => ({ ...b, cardCount: Number(b.cardCount) }));
   }),
 
+  /** Every distinct tag used across the team's cards — feeds the tag combobox
+   *  (suggestions) on the card editor and the filters. */
+  teamTags: authP
+    .input(z.object({ teamId: z.uuid() }))
+    .handler(async (info) => {
+      await assertTeamMember(info.context.user.id, info.input.teamId);
+      const result = await sql<{ tag: string }>`
+        select distinct unnest(tags) as tag
+        from cards
+        where team_id = ${info.input.teamId}
+        order by tag
+      `.execute(db);
+      return result.rows.map((r) => r.tag);
+    }),
+
   create: authP
     .input(
       z.object({

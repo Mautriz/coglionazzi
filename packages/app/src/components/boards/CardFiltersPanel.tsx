@@ -1,11 +1,10 @@
 import { FilterIcon } from "lucide-react";
-import { TagBadge } from "~/components/boards/TagBadge";
 import { AssigneeCombobox } from "~/components/custom/AssigneeCombobox";
 import { DatePicker } from "~/components/custom/DatePicker";
+import { TagCombobox } from "~/components/custom/TagCombobox";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { cn } from "~/lib/classUtils";
 import { isFilterActive, type CardFilters } from "~/lib/cardFilters";
 
 /** The card filter controls, shared by the board view and the archive view.
@@ -18,26 +17,15 @@ import { isFilterActive, type CardFilters } from "~/lib/cardFilters";
 export function CardFiltersPanel({
   filters,
   onPatch,
-  allTags,
   teamId,
   layout,
 }: {
   filters: CardFilters;
   onPatch: (patch: Partial<CardFilters>) => void;
-  allTags: string[];
   teamId: string | undefined;
   layout: "rail" | "bar";
 }) {
   const active = isFilterActive(filters);
-
-  const toggleTag = (tag: string) => {
-    const tags = filters.tags ?? [];
-    onPatch({
-      tags: tags.includes(tag)
-        ? tags.filter((t) => t !== tag)
-        : [...tags, tag],
-    });
-  };
 
   const clear = () =>
     onPatch({
@@ -59,20 +47,13 @@ export function CardFiltersPanel({
     </Button>
   );
 
-  const tagChips = allTags.length > 0 && (
-    <div className="flex flex-wrap gap-1">
-      {allTags.map((tag) => (
-        <button key={tag} type="button" onClick={() => toggleTag(tag)}>
-          <TagBadge
-            tag={tag}
-            className={cn(
-              "cursor-pointer",
-              !filters.tags?.includes(tag) && "opacity-50",
-            )}
-          />
-        </button>
-      ))}
-    </div>
+  const tagFilter = (
+    <TagCombobox
+      selected={filters.tags ?? []}
+      onChange={(tags) => onPatch({ tags: tags.length ? tags : undefined })}
+      teamId={teamId}
+      placeholder="Filter by tags…"
+    />
   );
 
   if (layout === "rail") {
@@ -93,12 +74,10 @@ export function CardFiltersPanel({
           className="h-7 text-sm"
         />
 
-        {tagChips && (
-          <div className="flex flex-col gap-1.5 px-1">
-            <Label className="text-xs text-muted-foreground">Tags</Label>
-            {tagChips}
-          </div>
-        )}
+        <div className="flex flex-col gap-1.5 px-1">
+          <Label className="text-xs text-muted-foreground">Tags</Label>
+          {tagFilter}
+        </div>
 
         <div className="flex flex-col gap-1.5 px-1">
           <Label className="text-xs text-muted-foreground">Assignees</Label>
@@ -145,6 +124,10 @@ export function CardFiltersPanel({
         />
       </div>
       <div className="flex flex-col gap-1">
+        <Label className="text-xs text-muted-foreground">Tags</Label>
+        <div className="w-56">{tagFilter}</div>
+      </div>
+      <div className="flex flex-col gap-1">
         <Label className="text-xs text-muted-foreground">Assignees</Label>
         <div className="w-56">
           <AssigneeCombobox
@@ -172,7 +155,6 @@ export function CardFiltersPanel({
         />
       </div>
       {clearButton}
-      {tagChips && <div className="w-full">{tagChips}</div>}
     </div>
   );
 }

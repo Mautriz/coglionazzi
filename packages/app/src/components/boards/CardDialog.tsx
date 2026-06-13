@@ -2,8 +2,8 @@ import { useMutation } from "@tanstack/react-query";
 import { ArchiveIcon, ArrowLeftIcon, ArrowRightIcon, LinkIcon, XIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { TagBadge } from "~/components/boards/TagBadge";
 import { AssigneeCombobox } from "~/components/custom/AssigneeCombobox";
+import { TagCombobox } from "~/components/custom/TagCombobox";
 import { MessageThread } from "~/components/custom/MessageThread";
 import {
   FilePreview,
@@ -58,7 +58,6 @@ export function CardDialog({
   onChanged: () => void;
 }) {
   const [title, setTitle] = useState(card.title);
-  const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState(card.tags);
   const [assigneeIds, setAssigneeIds] = useState(
     card.assignees.map((a) => a.id),
@@ -109,14 +108,6 @@ export function CardDialog({
     (c) =>
       c.id !== card.id && !card.relations.some((r) => r.cardId === c.id),
   );
-
-  function addTag() {
-    const tag = tagInput.trim();
-    if (tag && !tags.includes(tag)) {
-      setTags([...tags, tag]);
-    }
-    setTagInput("");
-  }
 
   function save() {
     if (!title.trim()) return;
@@ -257,35 +248,8 @@ export function CardDialog({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="card-tags">Tags</Label>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {tags.map((tag) => (
-              <TagBadge key={tag} tag={tag} className="gap-1 pr-1">
-                <button
-                  type="button"
-                  aria-label={`Remove ${tag}`}
-                  onClick={() => setTags(tags.filter((t) => t !== tag))}
-                  className="opacity-60 hover:opacity-100"
-                >
-                  <XIcon className="size-3" />
-                </button>
-              </TagBadge>
-            ))}
-            <Input
-              id="card-tags"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === ",") {
-                  e.preventDefault();
-                  addTag();
-                }
-              }}
-              onBlur={addTag}
-              placeholder="Add tag + Enter"
-              className="h-7 w-36 text-xs"
-            />
-          </div>
+          <Label>Tags</Label>
+          <TagCombobox selected={tags} onChange={setTags} teamId={teamId} />
         </div>
 
         <div className="flex flex-col gap-1.5">

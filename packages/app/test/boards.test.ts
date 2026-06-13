@@ -217,3 +217,38 @@ describe("board archive vs threads", () => {
     ).rejects.toThrowError(ORPCError);
   });
 });
+
+describe("team tags", () => {
+  it("returns the distinct tags across the team, sorted", async () => {
+    const { context } = await signUpTestUser();
+    const { columnId, cardId, board } = await makeBoardWithCard(context);
+    const teamId = board.team_id;
+    await call(
+      boardRouter.updateCard,
+      { cardId, tags: ["beta", "alpha"] },
+      { context },
+    );
+    const { id: card2 } = await call(
+      boardRouter.createCard,
+      { columnId, title: "c2" },
+      { context },
+    );
+    await call(
+      boardRouter.updateCard,
+      { cardId: card2, tags: ["beta", "gamma"] },
+      { context },
+    );
+
+    const tags = await call(boardRouter.teamTags, { teamId }, { context });
+    expect(tags).toEqual(["alpha", "beta", "gamma"]);
+  });
+
+  it("denies a non-member", async () => {
+    const { context: owner } = await signUpTestUser("Owner");
+    const { board } = await makeBoardWithCard(owner);
+    const { context: outsider } = await signUpTestUser("Out");
+    await expect(
+      call(boardRouter.teamTags, { teamId: board.team_id }, { context: outsider }),
+    ).rejects.toThrowError(ORPCError);
+  });
+});
