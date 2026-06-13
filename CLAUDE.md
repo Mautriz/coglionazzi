@@ -192,22 +192,25 @@ Run from repo root:
   re-syncs. The PointerSensor uses `activationConstraint.distance` so
   plain clicks still open the card dialog.
 - Card editing happens in `~/components/boards/CardDialog` (title, lexical
-  description, assignee chips, related-cards manager with a kind select,
-  tags via `<TagBadge>` hash-colored chips, attachments via the upload
-  helpers, comment thread at the bottom). `deleteBoard` / `deleteCard`
-  clean up the cards' comments (no FK — see below).
+  description, assignees via `<AssigneeCombobox>`, related-cards manager
+  with a kind select, tags via `<TagBadge>` hash-colored chips, attachments
+  via the upload helpers, comment thread at the bottom). `deleteBoard` /
+  `deleteCard` clean up the cards' comments (no FK — see below).
 - The boards section has its own left sidebar
   (`~/components/boards/BoardsSidebar`, rendered under the global topbar by
-  `routes/home/boards/route.tsx`): board list + inline create, and — when
-  a board is open — the filters. The global topbar/nav (Home/Boards/Demo +
-  global search) stays on every page; `UserActions` (theme + logout) is
-  shared.
+  `routes/home/boards/route.tsx`): the global `<SearchBox>` (boards-only —
+  it is NOT in the shared topbar), board list + inline create, and — when a
+  board is open — the filters. The global topbar/nav (Home/Boards/Demo)
+  stays on every page; `UserActions` (theme + logout) is shared.
 - Filtering is client-side over the already-loaded board: pure functions in
   `~/lib/cardFilters.ts` (`cardMatchesFilters`, `isFilterActive`) over the
   board route's search params (`q`, `tags`, `assignees`, `from`, `to`) —
   kept in the URL so filtered views are shareable. Date range compares UTC
-  calendar days (inclusive). `<UserAvatar>` renders hash-colored initials,
-  reused on cards and in the assignee filter.
+  calendar days (inclusive); the UI uses `<DatePicker>` (popover +
+  shadcn `Calendar`/react-day-picker). `<AssigneeCombobox>` (popover +
+  cmdk `Command`) is the searchable multi-select used for both card
+  assignees and the assignee filter. `<UserAvatar>` renders hash-colored
+  initials, reused on cards and in the pickers.
 
 ### Comments (polymorphic)
 

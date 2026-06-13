@@ -5,10 +5,12 @@ import {
   useParams,
   useSearch,
 } from "@tanstack/react-router";
-import { CheckIcon, FilterIcon, KanbanIcon, PlusIcon } from "lucide-react";
+import { FilterIcon, KanbanIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { TagBadge } from "~/components/boards/TagBadge";
-import { UserAvatar } from "~/components/custom/UserAvatar";
+import { AssigneeCombobox } from "~/components/custom/AssigneeCombobox";
+import { DatePicker } from "~/components/custom/DatePicker";
+import { SearchBox } from "~/components/custom/SearchBox";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -49,6 +51,10 @@ export function BoardsSidebar() {
       data-sidebar="sidebar"
       className="flex w-60 shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-3 text-sidebar-foreground max-md:hidden"
     >
+      <div className="pb-2">
+        <SearchBox />
+      </div>
+
       <h2 className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground2">
         Boards
       </h2>
@@ -118,7 +124,6 @@ function BoardFilters({ boardId }: { boardId: string }) {
   const { data: board } = useQuery(
     rpc.board.get.queryOptions({ input: { boardId } }),
   );
-  const { data: users } = useQuery(rpc.user.list.queryOptions());
 
   const allTags = [
     ...new Set(
@@ -205,49 +210,28 @@ function BoardFilters({ boardId }: { boardId: string }) {
         </div>
       )}
 
-      {users && users.length > 0 && (
-        <div className="flex flex-col gap-1 px-1">
-          <Label className="text-xs text-muted-foreground">Assignees</Label>
-          {users.map((user) => {
-            const active = search.assignees?.includes(user.id);
-            return (
-              <button
-                key={user.id}
-                type="button"
-                onClick={() =>
-                  patch({ assignees: toggle(search.assignees, user.id) })
-                }
-                className={cn(
-                  "flex items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-sidebar-accent",
-                  !active && "opacity-60",
-                )}
-              >
-                <UserAvatar id={user.id} name={user.name} size="xs" />
-                <span className="truncate">{user.name}</span>
-                {active && (
-                  <CheckIcon className="ml-auto size-3.5 text-primary" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <div className="flex flex-col gap-1.5 px-1">
+        <Label className="text-xs text-muted-foreground">Assignees</Label>
+        <AssigneeCombobox
+          selected={search.assignees ?? []}
+          onChange={(ids) => patch({ assignees: ids })}
+          placeholder="Filter by assignee…"
+        />
+      </div>
 
       <div className="flex flex-col gap-1.5 px-1">
         <Label className="text-xs text-muted-foreground">Created</Label>
         <div className="flex items-center gap-1.5">
-          <Input
-            type="date"
-            value={search.from ?? ""}
-            onChange={(e) => patch({ from: e.target.value || undefined })}
-            className="h-7 text-xs"
+          <DatePicker
+            value={search.from}
+            onChange={(v) => patch({ from: v })}
+            placeholder="From"
           />
           <span className="text-xs text-muted-foreground2">→</span>
-          <Input
-            type="date"
-            value={search.to ?? ""}
-            onChange={(e) => patch({ to: e.target.value || undefined })}
-            className="h-7 text-xs"
+          <DatePicker
+            value={search.to}
+            onChange={(v) => patch({ to: v })}
+            placeholder="To"
           />
         </div>
       </div>

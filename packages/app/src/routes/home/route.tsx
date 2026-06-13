@@ -1,6 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { Logo } from "~/components/custom/Logo";
-import { SearchBox } from "~/components/custom/SearchBox";
 import { UserActions } from "~/components/custom/UserActions";
 
 /** Protected area: everything under /home requires a session and shares the
@@ -46,7 +45,6 @@ function RouteComponent() {
           </nav>
         </div>
         <div className="flex flex-1 items-center justify-end gap-2">
-          <SearchBox />
           <UserActions />
         </div>
       </header>

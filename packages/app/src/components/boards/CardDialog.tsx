@@ -1,14 +1,14 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { ArrowLeftIcon, ArrowRightIcon, LinkIcon, Trash2Icon, XIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { TagBadge } from "~/components/boards/TagBadge";
+import { AssigneeCombobox } from "~/components/custom/AssigneeCombobox";
 import { CommentsSection } from "~/components/custom/CommentsSection";
 import {
   FilePreview,
   UploadButton,
 } from "~/components/custom/FileUploads";
-import { UserAvatar } from "~/components/custom/UserAvatar";
 import { RichTextEditor } from "~/components/editor/RichTextEditor";
 import { Button } from "~/components/ui/button";
 import {
@@ -60,8 +60,6 @@ export function CardDialog({
   const [assigneeIds, setAssigneeIds] = useState(
     card.assignees.map((a) => a.id),
   );
-
-  const { data: users } = useQuery(rpc.user.list.queryOptions());
   // Description JSON is captured on every editor change but only persisted
   // on Save, like the rest of the card.
   const descriptionRef = useRef<string | null>(card.description);
@@ -152,33 +150,10 @@ export function CardDialog({
 
         <div className="flex flex-col gap-1.5">
           <Label>Assignees</Label>
-          <div className="flex flex-wrap gap-1.5">
-            {users?.map((user) => {
-              const active = assigneeIds.includes(user.id);
-              return (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() =>
-                    setAssigneeIds((ids) =>
-                      active
-                        ? ids.filter((id) => id !== user.id)
-                        : [...ids, user.id],
-                    )
-                  }
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-full border border-card-border py-0.5 pl-0.5 pr-2.5 text-xs transition-colors hover:border-primary/40",
-                    active
-                      ? "bg-accent"
-                      : "opacity-55",
-                  )}
-                >
-                  <UserAvatar id={user.id} name={user.name} size="xs" />
-                  {user.name}
-                </button>
-              );
-            })}
-          </div>
+          <AssigneeCombobox
+            selected={assigneeIds}
+            onChange={setAssigneeIds}
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">
