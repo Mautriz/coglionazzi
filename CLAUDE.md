@@ -355,6 +355,20 @@ Postgres + a `uploads` volume for assets.
   `routes/home/teams/$teamId/route.tsx` and holds the global `<SearchBox>`
   (deliberately NOT in the topbar), the team's boards + spaces, and — when a
   board OR the archive is open — that view's filters.
+- **Mobile / responsive** (breakpoint = Tailwind `md`, 768px). Everything must
+  fit a ~390px viewport: a horizontal overflow anywhere triggers mobile
+  Chrome's shrink-to-fit and zooms the WHOLE app out, so keep wide rows
+  responsive. The topbar collapses below `md`: the section nav becomes a
+  `DropdownMenu` hamburger (`SectionMenu` in `routes/home/route.tsx`), the Logo
+  wordmark hides (`textClassName="hidden sm:inline"`), and `UserActions` goes
+  compact (BrandPicker hidden, icon-only logout). The Teams `<TeamRail>` +
+  `<TeamPanel>` are desktop sidebars (`max-md:hidden`) AND render inside a
+  left **Sheet** drawer on mobile, opened from `TeamsMobileBar`
+  (`routes/home/teams/route.tsx`, reads `teamId` via `useParams({strict:false})`).
+  Both components take `variant="sidebar" | "drawer"` (drawer drops
+  `max-md:hidden` and flexes to fill) + `onNavigate` (closes the drawer on a
+  link tap). Add the same `variant`/`onNavigate` plumbing to any new rail/panel
+  entry so it works in both layouts.
 - Filtering is client-side over the already-loaded board/archive: pure
   functions in `~/lib/cardFilters.ts` (`cardMatchesFilters`, `isFilterActive`,
   `mergeFilters` = merge a patch + drop emptied keys) over the active route's

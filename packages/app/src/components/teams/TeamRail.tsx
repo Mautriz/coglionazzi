@@ -22,7 +22,16 @@ import { useWorkspaceRealtime } from "~/lib/useRealtime";
  *  protected area (mounted by the /home shell). Top = Home (global chat +
  *  teams overview), then one bubble per team, then a "+" to create one.
  *  Selecting a team opens its second-column panel (see `<TeamPanel>`). */
-export function TeamRail() {
+export function TeamRail({
+  variant = "sidebar",
+  onNavigate,
+}: {
+  /** "sidebar" = the desktop inline rail (hidden on mobile); "drawer" = inside
+   *  the mobile slide-in Sheet (always visible). */
+  variant?: "sidebar" | "drawer";
+  /** Called after a navigation tap — lets the mobile drawer close itself. */
+  onNavigate?: () => void;
+} = {}) {
   // Live: add/remove/rename a team anywhere → the rail updates.
   useWorkspaceRealtime();
 
@@ -34,12 +43,16 @@ export function TeamRail() {
   return (
     <aside
       data-sidebar="sidebar"
-      className="flex w-18 shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-sidebar-border bg-sidebar py-3 max-md:hidden"
+      className={cn(
+        "flex w-18 shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-sidebar-border bg-sidebar py-3",
+        variant === "sidebar" && "max-md:hidden",
+      )}
     >
       <RailBubble active={homeActive}>
         <Link
           to="/home"
           aria-label="Home"
+          onClick={onNavigate}
           className={cn(
             "flex size-11 items-center justify-center rounded-xl bg-sidebar-accent text-sidebar-accent-foreground transition-all hover:rounded-lg",
             homeActive && "bg-primary/20 text-primary",
@@ -59,6 +72,7 @@ export function TeamRail() {
               to="/home/teams/$teamId"
               params={{ teamId: team.id }}
               title={team.name}
+              onClick={onNavigate}
               className={cn(
                 "transition-all hover:rounded-lg [&>span]:hover:rounded-lg",
                 active && "[&>span]:ring-2 [&>span]:ring-primary",
@@ -70,7 +84,7 @@ export function TeamRail() {
         );
       })}
 
-      <NewTeamBubble />
+      <NewTeamBubble onCreated={onNavigate} />
     </aside>
   );
 }
@@ -96,7 +110,7 @@ function RailBubble({
   );
 }
 
-function NewTeamBubble() {
+function NewTeamBubble({ onCreated }: { onCreated?: () => void }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -109,6 +123,7 @@ function NewTeamBubble() {
         setOpen(false);
         queryClient.invalidateQueries({ queryKey: rpc.team.list.key() });
         navigate({ to: "/home/teams/$teamId", params: { teamId: team.id } });
+        onCreated?.();
       },
     }),
   );

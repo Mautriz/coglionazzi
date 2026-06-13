@@ -308,7 +308,7 @@ function RouteComponent() {
           }}
         >
           <Trash2Icon />
-          Delete board
+          <span className="hidden sm:inline">Delete board</span>
         </Button>
         </div>
       </div>

@@ -7,9 +7,12 @@ import { cn } from "~/lib/classUtils";
 export function Logo({
   className,
   size = "md",
+  textClassName,
 }: {
   className?: string;
   size?: "sm" | "md" | "lg";
+  /** Extra classes for the wordmark — e.g. hide it on small screens. */
+  textClassName?: string;
 }) {
   const px = { sm: 30, md: 46, lg: 68 }[size];
   const text = { sm: "text-xl", md: "text-3xl", lg: "text-5xl" }[size];
@@ -23,6 +26,7 @@ export function Logo({
         className={cn(
           "font-display font-bold tracking-tight text-foreground",
           text,
+          textClassName,
         )}
       >
         Coglionazzi

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { MoonIcon, SunIcon } from "lucide-react";
+import { LogOutIcon, MoonIcon, SunIcon } from "lucide-react";
 import { UserAvatar } from "~/components/custom/UserAvatar";
 import { Button } from "~/components/ui/button";
 import { authClient } from "~/lib/authClient";
@@ -34,7 +34,11 @@ export function UserActions() {
 
   return (
     <>
-      <BrandPicker />
+      {/* The brand-skin swatch is a nice-to-have — drop it on phones to keep
+          the topbar within a narrow viewport. */}
+      <span className="hidden sm:inline-flex">
+        <BrandPicker />
+      </span>
       <Button variant="ghost" size="icon" onClick={toggleTheme}>
         {theme === "dark" ? <SunIcon /> : <MoonIcon />}
       </Button>
@@ -46,7 +50,22 @@ export function UserActions() {
           className="ml-1"
         />
       )}
-      <Button variant="outline" size="sm" onClick={logout}>
+      {/* Icon-only on phones, labelled from `sm` up. */}
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={logout}
+        aria-label="Log out"
+        className="sm:hidden"
+      >
+        <LogOutIcon />
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={logout}
+        className="hidden sm:inline-flex"
+      >
         Log out
       </Button>
     </>

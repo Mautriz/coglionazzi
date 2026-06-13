@@ -68,6 +68,12 @@ export const auth = betterAuth({
     accountLinking: {
       enabled: true,
       trustedProviders: ["discord"],
+      // This app does no email verification (no mail is sent), so every
+      // password account has email_verified = false. better-auth's default
+      // refuses to link a social login to an unverified local account — which
+      // would make Discord linking ALWAYS fail here. Turn that guard off; we
+      // accept the residual pre-registration-link risk (private friend group).
+      requireLocalEmailVerified: false,
     },
     fields: {
       createdAt: "created_at",

@@ -27,7 +27,18 @@ import { rpc } from "~/lib/rpcClient";
  *  inline create), and the team's other features (Chat, Archive, Games…).
  *  Rendered by `/home/teams/$teamId` next to the global `<TeamRail>`. When a
  *  board is open it also shows that board's filters. */
-export function TeamPanel({ teamId }: { teamId: string }) {
+export function TeamPanel({
+  teamId,
+  variant = "sidebar",
+  onNavigate,
+}: {
+  teamId: string;
+  /** "sidebar" = desktop inline column (hidden on mobile); "drawer" = inside
+   *  the mobile slide-in Sheet (always visible, flexes to fill it). */
+  variant?: "sidebar" | "drawer";
+  /** Called after a navigation tap — lets the mobile drawer close itself. */
+  onNavigate?: () => void;
+}) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const matchRoute = useMatchRoute();
@@ -58,6 +69,7 @@ export function TeamPanel({ teamId }: { teamId: string }) {
           to: "/home/teams/$teamId/board/$boardId",
           params: { teamId, boardId: board.id },
         });
+        onNavigate?.();
       },
     }),
   );
@@ -65,7 +77,10 @@ export function TeamPanel({ teamId }: { teamId: string }) {
   return (
     <aside
       data-sidebar="sidebar"
-      className="flex w-60 shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-3 text-sidebar-foreground max-md:hidden"
+      className={cn(
+        "flex flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-3 text-sidebar-foreground",
+        variant === "sidebar" ? "w-60 shrink-0 max-md:hidden" : "min-w-0 flex-1",
+      )}
     >
       <div className="pb-2">
         <SearchBox />
@@ -99,6 +114,7 @@ export function TeamPanel({ teamId }: { teamId: string }) {
           key={board.id}
           to="/home/teams/$teamId/board/$boardId"
           params={{ teamId, boardId: board.id }}
+          onClick={onNavigate}
           className={cn(
             "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             board.id === activeBoardId &&
@@ -148,6 +164,7 @@ export function TeamPanel({ teamId }: { teamId: string }) {
           to="/home/teams/$teamId/chat"
           teamId={teamId}
           active={chatActive}
+          onNavigate={onNavigate}
           icon={<MessagesSquareIcon className="size-4 shrink-0" />}
           label="Chat"
         />
@@ -155,6 +172,7 @@ export function TeamPanel({ teamId }: { teamId: string }) {
           to="/home/teams/$teamId/archive"
           teamId={teamId}
           active={archiveActive}
+          onNavigate={onNavigate}
           icon={<ArchiveIcon className="size-4 shrink-0" />}
           label="Archive"
         />
@@ -189,17 +207,20 @@ function FeatureLink({
   active,
   icon,
   label,
+  onNavigate,
 }: {
   to: "/home/teams/$teamId/chat" | "/home/teams/$teamId/archive";
   teamId: string;
   active: boolean;
   icon: React.ReactNode;
   label: string;
+  onNavigate?: () => void;
 }) {
   return (
     <Link
       to={to}
       params={{ teamId }}
+      onClick={onNavigate}
       className={cn(
         "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",

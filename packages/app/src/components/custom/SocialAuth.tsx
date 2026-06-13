@@ -36,6 +36,9 @@ export function DiscordSignInButton() {
         const { error } = await authClient.signIn.social({
           provider: "discord",
           callbackURL: "/home",
+          // Send OAuth-callback failures (denied consent, link refused, …) back
+          // to login instead of better-auth's raw /api/auth/error page.
+          errorCallbackURL: "/auth/login",
         });
         if (error) {
           setPending(false);
