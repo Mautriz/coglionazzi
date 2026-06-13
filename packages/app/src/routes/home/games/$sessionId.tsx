@@ -5,6 +5,7 @@ import {
   ClockIcon,
   CrownIcon,
   LockIcon,
+  MessagesSquareIcon,
   Share2Icon,
   SparklesIcon,
   UsersIcon,
@@ -12,6 +13,7 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { DeckStats } from "~/components/games/DeckStats";
+import { MessageThread } from "~/components/custom/MessageThread";
 import { UserAvatar } from "~/components/custom/UserAvatar";
 import { Button } from "~/components/ui/button";
 import {
@@ -49,16 +51,46 @@ function RouteComponent() {
   if (!session) return null;
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 py-8">
+    <main className="flex w-full flex-1 flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
       <Header session={session} />
-      {session.status === "lobby" && (
-        <Lobby session={session} livePlayers={players} />
-      )}
-      {session.status === "active" && (
-        <ActiveMatchup session={session} liveVotes={liveVotes} reveal={reveal} />
-      )}
-      {session.status === "finished" && <Finished session={session} />}
+      {/* Game on the left, the session's chat on the right (stacks below on
+          mobile). The SAME room backs the lobby, the live matchup and the
+          results — so banter carries through the whole game. */}
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr_21rem]">
+        <div className="flex min-w-0 flex-col gap-6">
+          {session.status === "lobby" && (
+            <Lobby session={session} livePlayers={players} />
+          )}
+          {session.status === "active" && (
+            <ActiveMatchup
+              session={session}
+              liveVotes={liveVotes}
+              reveal={reveal}
+            />
+          )}
+          {session.status === "finished" && <Finished session={session} />}
+        </div>
+        <GameChat sessionId={session.id} />
+      </div>
     </main>
+  );
+}
+
+/** The session's chat — persistent across lobby / live / finished. */
+function GameChat({ sessionId }: { sessionId: string }) {
+  return (
+    <section className="flex flex-col gap-2 rounded-lg border border-card-border bg-card-background p-4 lg:sticky lg:top-6">
+      <h2 className="flex items-center gap-2 font-display text-sm font-semibold">
+        <MessagesSquareIcon className="size-4 text-primary" />
+        Game chat
+      </h2>
+      <MessageThread
+        roomRef={{ scope: "game", sessionId }}
+        emptyText="No messages yet — talk some trash."
+        composerPlaceholder="Message the players…"
+        maxHeightClass="max-h-[60vh] lg:max-h-[calc(100dvh-12rem)]"
+      />
+    </section>
   );
 }
 
@@ -247,7 +279,9 @@ function ActiveMatchup({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    // The duel stays a focused, centered "stage" even when the page fills a
+    // wide screen — otherwise the two portrait images would balloon.
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">
           Round {current.round}

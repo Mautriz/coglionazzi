@@ -1,15 +1,17 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { db } from "../db";
+import { assertSessionAccess } from "./game/access";
 import { assertCardAccess, assertTeamMember } from "./teamAccess";
 
 /** A chat room is identified by the entity it belongs to. `global` is the
- *  single app-wide room; `team`/`card` point at a team/card by id. Add a
- *  variant (e.g. `game`, `dm`) here + a branch in the two switches below. */
+ *  single app-wide room; `team`/`card`/`game` point at a team/card/game-session
+ *  by id. Add a variant (e.g. `dm`) here + a branch in the two switches below. */
 export const roomRefSchema = z.discriminatedUnion("scope", [
   z.object({ scope: z.literal("global") }),
   z.object({ scope: z.literal("team"), teamId: z.uuid() }),
   z.object({ scope: z.literal("card"), cardId: z.uuid() }),
+  z.object({ scope: z.literal("game"), sessionId: z.uuid() }),
 ]);
 export type RoomRef = z.infer<typeof roomRefSchema>;
 
@@ -27,6 +29,8 @@ function refToKindOwner(ref: RoomRef): { kind: string; ownerId: string | null } 
       return { kind: "team", ownerId: ref.teamId };
     case "card":
       return { kind: "card", ownerId: ref.cardId };
+    case "game":
+      return { kind: "game", ownerId: ref.sessionId };
   }
 }
 
@@ -41,6 +45,9 @@ export async function assertRefAccess(userId: string, ref: RoomRef) {
       return assertTeamMember(userId, ref.teamId);
     case "card":
       return assertCardAccess(userId, ref.cardId);
+    case "game":
+      await assertSessionAccess(userId, ref.sessionId);
+      return;
   }
 }
 
@@ -103,6 +110,9 @@ export async function assertRoomAccess(
       break;
     case "card":
       await assertCardAccess(userId, room.owner_id!);
+      break;
+    case "game":
+      await assertSessionAccess(userId, room.owner_id!);
       break;
     default:
       throw new ORPCError("FORBIDDEN", { message: "Unknown room kind" });

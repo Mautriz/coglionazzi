@@ -425,8 +425,11 @@ Postgres + a `uploads` volume for assets.
   A `chat_rooms(kind, owner_id, …)` row is identified by the entity it
   belongs to: `'global'` (owner_id NULL — the single app-wide room, any
   logged-in user), `'team'` (owner_id = team.id, members), `'card'` (owner_id
-  = card.id, card access). Add a kind (e.g. `game`, `dm`) + a branch in
-  `roomAccess.ts`. NO FK on `owner_id` and no `team_id` column — access and
+  = card.id, card access), `'game'` (owner_id = game_session.id, gated by
+  `assertSessionAccess` — the play view's persistent chat, see Games). Add a
+  kind (e.g. `dm`) + a branch in `roomAccess.ts`'s three switches (one room
+  ref per session = the same room across lobby / live / finished). NO FK on
+  `owner_id` and no `team_id` column — access and
   cleanup are resolved per-kind, mirroring the old polymorphic `comments`
   (which this REPLACED — there is no comments table anymore).
 - `src/server/orpc/roomAccess.ts`: `roomRefSchema` (the `{scope}` union),
@@ -486,8 +489,10 @@ Postgres + a `uploads` volume for assets.
   else can `clone` a deck into their own editable copy. Edited in place
   (auto-save) in the deck editor; images use the upload helpers (optimized on
   upload — see File uploads). `stats({deckId})` aggregates per-card appearances /
-  votes / wins / championships / win-rate across the deck's completed games
-  (`/home/games/decks/$deckId/stats`).
+  votes / **1v1 wins** (head-to-head matchups won) / **championships** (whole
+  games won — bracket champion) / win-rate across the deck's completed games.
+  `<DeckStats>` surfaces BOTH win notions distinctly (the deck stats page +
+  the game's finished screen) — keep that distinction (1v1 wins ≠ titles).
 - **Sessions** (`game_sessions` + frozen `game_session_players` roster):
   `rpc.game.sessions.*` — create({deckId,visibility,teamId?}), list (public
   lobbies only — private games are unlisted), get (full snapshot), subscribe.
@@ -521,9 +526,16 @@ Postgres + a `uploads` volume for assets.
   finished) is signal-and-refetch, `presence` is the live roster.
 - UI: `/home/games` (topbar **Games** link) lists open lobbies + decks;
   `decks/$deckId` is the editor (+ Play → `<NewGameDialog>`); `$sessionId` is the
-  play view (lobby → live matchup voting → champion + results). New game = new
-  `*_` tables + a realtime engine + a `game.<kind>.*` module; reuse decks/sessions/
-  presence.
+  play view (lobby → live matchup voting → champion + results) — a two-column
+  layout (game + a persistent **`<MessageThread roomRef={{scope:'game',
+  sessionId}}>`** chat that carries across all three states; stacks under the
+  game on mobile). New game = new `*_` tables + a realtime engine + a
+  `game.<kind>.*` module; reuse decks/sessions/presence.
+- Layout width: the topbar-shell content pages (home chat, demo, a game
+  session, team chat, deck stats) fill the viewport with `px-4 … lg:px-8`
+  padding — NOT a narrow centered `max-w-*` (deliberately edge-filling per
+  preference). Only intrinsically-focused bits keep a cap (the versus duel's
+  two portrait images, `max-w-2xl`, so they don't balloon on wide screens).
 
 ### Realtime (WebSockets)
 

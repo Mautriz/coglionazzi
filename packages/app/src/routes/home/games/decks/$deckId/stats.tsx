@@ -24,7 +24,7 @@ function RouteComponent() {
   );
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 py-6">
+    <main className="flex w-full flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
       <Link
         to="/home/games/decks/$deckId"
         params={{ deckId }}

@@ -30,6 +30,14 @@ export const auth = betterAuth({
           clientSecret: process.env.DISCORD_CLIENT_SECRET as string,
           // Discord verifies emails before exposing them, so it's safe to
           // trust for auto-linking (see accountLinking below).
+          //
+          // Mirror the Discord identity (display name + avatar + email) onto
+          // the user on EVERY Discord login — this is a Discord friend-group
+          // app, so the Discord profile is the source of truth. Without this,
+          // linking only attaches tokens and never copies the avatar, so a
+          // pre-existing account keeps its old (blank) image. Note: this
+          // overwrites any custom in-app name with the Discord one each login.
+          overrideUserInfoOnSignIn: true,
         },
       }
     : {},

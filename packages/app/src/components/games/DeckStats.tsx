@@ -1,11 +1,13 @@
-import { CrownIcon, FlameIcon } from "lucide-react";
+import { CrownIcon, FlameIcon, SwordsIcon } from "lucide-react";
 import type { Outputs } from "~/lib/rpcClient";
 
 type Stats = Outputs["game"]["decks"]["stats"];
 type Row = Stats["cards"][number];
 
-/** Per-card deck statistics — highlights (most wins / most picked) + a full
- *  table. Shared by the deck stats page and the game's winner screen. */
+/** Per-card deck statistics. Two distinct "win" notions are tracked side by
+ *  side: **1v1 wins** = head-to-head matchups (duels) won, and **titles** =
+ *  whole games won (bracket champion). Highlights + a full table; shared by
+ *  the deck stats page and the game's winner screen. */
 export function DeckStats({ stats }: { stats: Stats }) {
   if (stats.gamesPlayed === 0) {
     return (
@@ -17,16 +19,36 @@ export function DeckStats({ stats }: { stats: Stats }) {
 
   const played = stats.cards.filter((c) => c.appearances > 0);
   const mostWins = [...played].sort((a, b) => b.wins - a.wins)[0];
+  const champion = [...played].sort(
+    (a, b) => b.championships - a.championships,
+  )[0];
   const mostPicked = [...played].sort((a, b) => b.votes - a.votes)[0];
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <p className="text-xs text-muted-foreground2">
+        {stats.gamesPlayed} game{stats.gamesPlayed === 1 ? "" : "s"} played ·{" "}
+        <span className="font-medium text-muted-foreground">1v1 wins</span> are
+        head-to-head matchups won · <span className="font-medium text-muted-foreground">titles</span>{" "}
+        are whole games won (bracket champion).
+      </p>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Highlight
+          icon={<SwordsIcon className="size-4" />}
+          label="Most 1v1 wins"
+          card={mostWins}
+          value={mostWins ? `${mostWins.wins} duels won` : "—"}
+        />
         <Highlight
           icon={<CrownIcon className="size-4" />}
-          label="Most wins"
-          card={mostWins}
-          value={mostWins ? `${mostWins.wins} wins` : "—"}
+          label="Most titles"
+          card={champion && champion.championships > 0 ? champion : undefined}
+          value={
+            champion && champion.championships > 0
+              ? `${champion.championships} title${champion.championships === 1 ? "" : "s"}`
+              : "—"
+          }
         />
         <Highlight
           icon={<FlameIcon className="size-4" />}
@@ -36,16 +58,36 @@ export function DeckStats({ stats }: { stats: Stats }) {
         />
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-card-border">
+      <div className="overflow-x-auto rounded-lg border border-card-border">
         <table className="w-full text-sm">
           <thead className="bg-card-background text-xs text-muted-foreground2">
             <tr>
               <th className="px-3 py-2 text-left font-medium">Image</th>
-              <th className="px-3 py-2 text-right font-medium">Wins</th>
-              <th className="px-3 py-2 text-right font-medium">Win%</th>
+              <th
+                className="px-3 py-2 text-right font-medium"
+                title="Head-to-head matchups (duels) won"
+              >
+                1v1 wins
+              </th>
+              <th
+                className="px-3 py-2 text-right font-medium"
+                title="Share of this image's duels that it won"
+              >
+                Win%
+              </th>
               <th className="px-3 py-2 text-right font-medium">Votes</th>
-              <th className="px-3 py-2 text-right font-medium">Rounds</th>
-              <th className="px-3 py-2 text-right font-medium">🏆</th>
+              <th
+                className="px-3 py-2 text-right font-medium"
+                title="Matchups this image appeared in"
+              >
+                Rounds
+              </th>
+              <th
+                className="px-3 py-2 text-right font-medium"
+                title="Whole games won — bracket champion"
+              >
+                Titles 🏆
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-card-border">
@@ -74,7 +116,7 @@ export function DeckStats({ stats }: { stats: Stats }) {
                 <td className="px-3 py-2 text-right tabular-nums text-muted-foreground2">
                   {c.appearances}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">
+                <td className="px-3 py-2 text-right font-medium tabular-nums">
                   {c.championships || ""}
                 </td>
               </tr>

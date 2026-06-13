@@ -31,7 +31,7 @@ function RouteComponent() {
   const name = teams?.find((t) => t.id === teamId)?.name ?? "Team";
 
   return (
-    <main className="mx-auto flex w-full max-w-215 flex-1 flex-col gap-3 p-4 py-6">
+    <main className="flex w-full flex-1 flex-col gap-3 px-4 py-6 sm:px-6 lg:px-8">
       <h1 className="flex items-center gap-2 font-display text-2xl font-bold">
         <MessagesSquareIcon className="size-6 text-primary" />
         {name} chat
