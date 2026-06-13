@@ -6,6 +6,7 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import {
+  ArchiveIcon,
   FilterIcon,
   KanbanIcon,
   PlusIcon,
@@ -34,8 +35,9 @@ type Board = Outputs["board"]["list"][number];
  *  defines for sidebars. */
 export function BoardsSidebar() {
   const queryClient = useQueryClient();
-  // undefined outside a specific board (e.g. on /home/boards).
-  const { boardId } = useParams({ strict: false });
+  // undefined outside a specific board (e.g. on /home/boards). On the archive
+  // route the param is `teamId` instead.
+  const { boardId, teamId: archiveTeamId } = useParams({ strict: false });
 
   const { data: teams } = useQuery(rpc.team.list.queryOptions());
   const { data: boards } = useQuery(rpc.board.list.queryOptions());
@@ -69,6 +71,7 @@ export function BoardsSidebar() {
           team={team}
           boards={boards?.filter((b) => b.team_id === team.id) ?? []}
           activeBoardId={boardId}
+          activeArchiveTeamId={archiveTeamId}
           onSettings={() => setSettingsTeam(team)}
         />
       ))}
@@ -117,11 +120,13 @@ function TeamSection({
   team,
   boards,
   activeBoardId,
+  activeArchiveTeamId,
   onSettings,
 }: {
   team: Team;
   boards: Board[];
   activeBoardId?: string;
+  activeArchiveTeamId?: string;
   onSettings: () => void;
 }) {
   const navigate = useNavigate();
@@ -210,6 +215,19 @@ function TeamSection({
           Add board
         </button>
       )}
+
+      <Link
+        to="/home/boards/archive/$teamId"
+        params={{ teamId: team.id }}
+        className={cn(
+          "flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          team.id === activeArchiveTeamId &&
+            "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+        )}
+      >
+        <ArchiveIcon className="size-3.5" />
+        Archive
+      </Link>
     </div>
   );
 }

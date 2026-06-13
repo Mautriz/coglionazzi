@@ -88,12 +88,12 @@ async function teamIdOfColumn(columnId: string): Promise<string> {
 }
 
 async function teamIdOfCard(cardId: string): Promise<string> {
+  // `team_id` is denormalized onto the card so this resolves even for an
+  // archived card whose column/board has been deleted (column_id is null).
   const row = await db
     .selectFrom("cards")
-    .innerJoin("board_columns", "board_columns.id", "cards.column_id")
-    .innerJoin("boards", "boards.id", "board_columns.board_id")
     .where("cards.id", "=", cardId)
-    .select("boards.team_id")
+    .select("cards.team_id")
     .executeTakeFirst();
   if (!row) throw new ORPCError("NOT_FOUND", { message: "Card not found" });
   return row.team_id;

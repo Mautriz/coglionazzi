@@ -22,6 +22,7 @@ import { Route as HomeBoardsIndexRouteImport } from './routes/home/boards/index'
 import { Route as HomeBoardsBoardIdRouteImport } from './routes/home/boards/$boardId'
 import { Route as ApiRpcSplatRouteImport } from './routes/api/rpc/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as HomeBoardsArchiveTeamIdRouteImport } from './routes/home/boards/archive.$teamId'
 
 const HomeRouteRoute = HomeRouteRouteImport.update({
   id: '/home',
@@ -88,6 +89,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HomeBoardsArchiveTeamIdRoute = HomeBoardsArchiveTeamIdRouteImport.update({
+  id: '/archive/$teamId',
+  path: '/archive/$teamId',
+  getParentRoute: () => HomeBoardsRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/home/boards/$boardId': typeof HomeBoardsBoardIdRoute
   '/home/boards/': typeof HomeBoardsIndexRoute
+  '/home/boards/archive/$teamId': typeof HomeBoardsArchiveTeamIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -116,6 +123,7 @@ export interface FileRoutesByTo {
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/home/boards/$boardId': typeof HomeBoardsBoardIdRoute
   '/home/boards': typeof HomeBoardsIndexRoute
+  '/home/boards/archive/$teamId': typeof HomeBoardsArchiveTeamIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -132,6 +140,7 @@ export interface FileRoutesById {
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/home/boards/$boardId': typeof HomeBoardsBoardIdRoute
   '/home/boards/': typeof HomeBoardsIndexRoute
+  '/home/boards/archive/$teamId': typeof HomeBoardsArchiveTeamIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -149,6 +158,7 @@ export interface FileRouteTypes {
     | '/api/rpc/$'
     | '/home/boards/$boardId'
     | '/home/boards/'
+    | '/home/boards/archive/$teamId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -162,6 +172,7 @@ export interface FileRouteTypes {
     | '/api/rpc/$'
     | '/home/boards/$boardId'
     | '/home/boards'
+    | '/home/boards/archive/$teamId'
   id:
     | '__root__'
     | '/'
@@ -177,6 +188,7 @@ export interface FileRouteTypes {
     | '/api/rpc/$'
     | '/home/boards/$boardId'
     | '/home/boards/'
+    | '/home/boards/archive/$teamId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -281,6 +293,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/home/boards/archive/$teamId': {
+      id: '/home/boards/archive/$teamId'
+      path: '/archive/$teamId'
+      fullPath: '/home/boards/archive/$teamId'
+      preLoaderRoute: typeof HomeBoardsArchiveTeamIdRouteImport
+      parentRoute: typeof HomeBoardsRouteRoute
+    }
   }
 }
 
@@ -301,11 +320,13 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
 interface HomeBoardsRouteRouteChildren {
   HomeBoardsBoardIdRoute: typeof HomeBoardsBoardIdRoute
   HomeBoardsIndexRoute: typeof HomeBoardsIndexRoute
+  HomeBoardsArchiveTeamIdRoute: typeof HomeBoardsArchiveTeamIdRoute
 }
 
 const HomeBoardsRouteRouteChildren: HomeBoardsRouteRouteChildren = {
   HomeBoardsBoardIdRoute: HomeBoardsBoardIdRoute,
   HomeBoardsIndexRoute: HomeBoardsIndexRoute,
+  HomeBoardsArchiveTeamIdRoute: HomeBoardsArchiveTeamIdRoute,
 }
 
 const HomeBoardsRouteRouteWithChildren = HomeBoardsRouteRoute._addFileChildren(

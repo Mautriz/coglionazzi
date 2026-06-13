@@ -7,6 +7,7 @@ import {
   fileUrl,
   type FileMetadata,
 } from "../files";
+import { archiveRouter } from "./archive";
 import { authP, getAuthSession, t } from "./base";
 import { boardRouter } from "./boards";
 import { commentRouter } from "./comments";
@@ -84,6 +85,7 @@ export const appRouter = {
     }),
   },
   board: boardRouter,
+  archive: archiveRouter,
   comment: commentRouter,
   search: searchRouter,
   team: teamRouter,

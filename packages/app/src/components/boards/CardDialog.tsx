@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { ArrowLeftIcon, ArrowRightIcon, LinkIcon, Trash2Icon, XIcon } from "lucide-react";
+import { ArchiveIcon, ArrowLeftIcon, ArrowRightIcon, LinkIcon, XIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { TagBadge } from "~/components/boards/TagBadge";
@@ -77,10 +77,11 @@ export function CardDialog({
     }),
   );
 
-  const { mutate: deleteCard, isPending: isDeleting } = useMutation(
-    rpc.board.deleteCard.mutationOptions({
+  const { mutate: archiveCard, isPending: isArchiving } = useMutation(
+    rpc.board.archiveCard.mutationOptions({
       onSuccess: () => {
         onChanged();
+        toast.success("Card archived");
         onClose();
       },
     }),
@@ -337,12 +338,12 @@ export function CardDialog({
             type="button"
             variant="ghost"
             size="sm"
-            className="text-destructive hover:text-destructive"
-            disabled={isDeleting}
-            onClick={() => deleteCard({ cardId: card.id })}
+            className="text-muted-foreground hover:text-foreground"
+            disabled={isArchiving}
+            onClick={() => archiveCard({ cardId: card.id })}
           >
-            <Trash2Icon />
-            Delete
+            <ArchiveIcon />
+            Archive
           </Button>
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={onClose}>

@@ -66,6 +66,7 @@ export const searchRouter = {
           .innerJoin("board_columns", "board_columns.id", "cards.column_id")
           .innerJoin("boards", "boards.id", "board_columns.board_id")
           .where("boards.team_id", "in", teamIds)
+          .where("cards.archived_at", "is", null)
           .where((eb) =>
             eb.or([
               matches(q, "cards.title"),
@@ -94,6 +95,7 @@ export const searchRouter = {
           .leftJoin("users", "users.id", "comments.created_by")
           .where("comments.entity_type", "=", "card")
           .where("boards.team_id", "in", teamIds)
+          .where("cards.archived_at", "is", null)
           .where(matches(q, "comments.body_text"))
           .select([
             "comments.id",

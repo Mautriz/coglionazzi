@@ -292,7 +292,7 @@ function RouteComponent() {
           className="text-destructive hover:text-destructive"
           disabled={isDeletingBoard}
           onClick={() => {
-            if (window.confirm(`Delete board "${board.name}" and all its cards?`)) {
+            if (window.confirm(`Delete board "${board.name}"? Its cards will be moved to the team archive.`)) {
               deleteBoard({ boardId });
             }
           }}
@@ -459,7 +459,7 @@ function ColumnSection({
           onClick={() => {
             if (
               window.confirm(
-                `Delete column "${column.name}" and its ${column.cards.length} card(s)?`,
+                `Delete column "${column.name}"? Its ${column.cards.length} card(s) will be moved to the team archive.`,
               )
             ) {
               deleteColumn({ columnId: column.id });

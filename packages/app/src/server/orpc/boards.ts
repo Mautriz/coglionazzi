@@ -1,4 +1,5 @@
 import { ORPCError } from "@orpc/server";
+import { sql } from "kysely";
 import { z } from "zod";
 import { db } from "../db";
 import { fileUrl, type FileMetadata } from "../files";
@@ -15,7 +16,7 @@ import {
 
 /** Comments have no FK on entity_id (polymorphic) — entity owners call this
  *  from their delete procedures. */
-async function deleteCommentsOf(
+export async function deleteCommentsOf(
   entityType: CommentEntityType,
   entityIds: string[],
 ) {
@@ -46,13 +47,123 @@ async function clearRelation(a: string, b: string) {
 }
 
 /** Next position at the end of a column (cards) or board (columns). */
-async function nextCardPosition(columnId: string): Promise<number> {
+export async function nextCardPosition(columnId: string): Promise<number> {
   const row = await db
     .selectFrom("cards")
     .where("column_id", "=", columnId)
     .select((eb) => eb.fn.max("position").as("max"))
     .executeTakeFirst();
   return (row?.max ?? 0) + 1;
+}
+
+type CardRow = { id: string; description: unknown | null };
+
+/** Resolve a set of cards into the fully-nested shape the UI expects:
+ *  serialized description, assignees, perspective-aware relations, comment
+ *  count, attachment files. Shared by `board.get` and `archive.list`.
+ *  `liveRelationsOnly` excludes archived counterparts (boards hide relations
+ *  to archived cards; the archive shows relations among archived cards). */
+export async function attachCardExtras<T extends CardRow>(
+  cards: T[],
+  { liveRelationsOnly }: { liveRelationsOnly: boolean },
+) {
+  if (cards.length === 0) return [];
+  const cardIds = cards.map((c) => c.id);
+
+  const attachments = await db
+    .selectFrom("card_attachments")
+    .innerJoin("files", "files.id", "card_attachments.file_id")
+    .where("card_attachments.card_id", "in", cardIds)
+    .select([
+      "card_attachments.card_id",
+      "files.id",
+      "files.path",
+      "files.metadata",
+    ])
+    .execute();
+
+  const assignees = await db
+    .selectFrom("card_assignees")
+    .innerJoin("users", "users.id", "card_assignees.user_id")
+    .where("card_assignees.card_id", "in", cardIds)
+    .select(["card_assignees.card_id", "users.id", "users.name"])
+    .execute();
+
+  // Relations are stored normalized (card_id < related_card_id) — fetch both
+  // directions for these cards and join the other side's title for display.
+  let relationQuery = db
+    .selectFrom("card_relations")
+    .innerJoin("cards as a", "a.id", "card_relations.card_id")
+    .innerJoin("cards as b", "b.id", "card_relations.related_card_id")
+    .where((eb) =>
+      eb.or([
+        eb("card_relations.card_id", "in", cardIds),
+        eb("card_relations.related_card_id", "in", cardIds),
+      ]),
+    );
+  if (liveRelationsOnly) {
+    relationQuery = relationQuery
+      .where("a.archived_at", "is", null)
+      .where("b.archived_at", "is", null);
+  }
+  const relations = await relationQuery
+    .select([
+      "card_relations.card_id as aId",
+      "card_relations.related_card_id as bId",
+      "card_relations.kind",
+      "a.title as aTitle",
+      "b.title as bTitle",
+    ])
+    .execute();
+
+  // Kind from this card's perspective: a directed 'blocks' row reads as
+  // "blocks" from the blocker and "blocked_by" from the blocked card.
+  const relationsOf = (cardId: string) =>
+    relations
+      .filter((r) => r.aId === cardId || r.bId === cardId)
+      .map((r) =>
+        r.aId === cardId
+          ? {
+              cardId: r.bId,
+              title: r.bTitle,
+              kind: r.kind === "blocks" ? ("blocks" as const) : ("related" as const),
+            }
+          : {
+              cardId: r.aId,
+              title: r.aTitle,
+              kind: r.kind === "blocks" ? ("blocked_by" as const) : ("related" as const),
+            },
+      );
+
+  const commentCounts = await db
+    .selectFrom("comments")
+    .where("entity_type", "=", "card")
+    .where("entity_id", "in", cardIds)
+    .select(({ fn }) => ["entity_id", fn.count<number>("id").as("count")])
+    .groupBy("entity_id")
+    .execute();
+
+  return cards.map((card) => ({
+    ...card,
+    // jsonb comes back parsed; the editor wants the serialized string.
+    description:
+      card.description == null ? null : JSON.stringify(card.description),
+    assignees: assignees
+      .filter((a) => a.card_id === card.id)
+      .map((a) => ({ id: a.id, name: a.name })),
+    relations: relationsOf(card.id),
+    // count(*) is bigint → pg hands it over as a string.
+    commentCount: Number(
+      commentCounts.find((c) => c.entity_id === card.id)?.count ?? 0,
+    ),
+    attachments: attachments
+      .filter((a) => a.card_id === card.id)
+      .map((a) => ({
+        id: a.id,
+        url: fileUrl(a.path),
+        metadata: a.metadata as FileMetadata,
+      })),
+  }));
 }
 
 export const boardRouter = {
@@ -66,7 +177,12 @@ export const boardRouter = {
       .selectFrom("boards")
       .innerJoin("teams", "teams.id", "boards.team_id")
       .leftJoin("board_columns", "board_columns.board_id", "boards.id")
-      .leftJoin("cards", "cards.column_id", "board_columns.id")
+      // Archived cards are detached/hidden — keep them out of the count.
+      .leftJoin("cards", (join) =>
+        join
+          .onRef("cards.column_id", "=", "board_columns.id")
+          .on("cards.archived_at", "is", null),
+      )
       .where("boards.team_id", "in", teamIds)
       .select(({ fn }) => [
         "boards.id",
@@ -154,124 +270,15 @@ export const boardRouter = {
               "in",
               columns.map((c) => c.id),
             )
+            .where("archived_at", "is", null)
             .selectAll()
             .orderBy("position", "asc")
             .execute()
         : [];
 
-      const attachments = cards.length
-        ? await db
-            .selectFrom("card_attachments")
-            .innerJoin("files", "files.id", "card_attachments.file_id")
-            .where(
-              "card_attachments.card_id",
-              "in",
-              cards.map((c) => c.id),
-            )
-            .select([
-              "card_attachments.card_id",
-              "files.id",
-              "files.path",
-              "files.metadata",
-            ])
-            .execute()
-        : [];
-
-      const assignees = cards.length
-        ? await db
-            .selectFrom("card_assignees")
-            .innerJoin("users", "users.id", "card_assignees.user_id")
-            .where(
-              "card_assignees.card_id",
-              "in",
-              cards.map((c) => c.id),
-            )
-            .select(["card_assignees.card_id", "users.id", "users.name"])
-            .execute()
-        : [];
-
-      // Relations are stored normalized (card_id < related_card_id) — fetch
-      // both directions for the board's cards and join the other side's
-      // title for display.
-      const cardIds = cards.map((c) => c.id);
-      const relations = cards.length
-        ? await db
-            .selectFrom("card_relations")
-            .innerJoin("cards as a", "a.id", "card_relations.card_id")
-            .innerJoin("cards as b", "b.id", "card_relations.related_card_id")
-            .where((eb) =>
-              eb.or([
-                eb("card_relations.card_id", "in", cardIds),
-                eb("card_relations.related_card_id", "in", cardIds),
-              ]),
-            )
-            .select([
-              "card_relations.card_id as aId",
-              "card_relations.related_card_id as bId",
-              "card_relations.kind",
-              "a.title as aTitle",
-              "b.title as bTitle",
-            ])
-            .execute()
-        : [];
-
-      // Kind from this card's perspective: a directed 'blocks' row reads as
-      // "blocks" from the blocker and "blocked_by" from the blocked card.
-      const relationsOf = (cardId: string) =>
-        relations
-          .filter((r) => r.aId === cardId || r.bId === cardId)
-          .map((r) =>
-            r.aId === cardId
-              ? {
-                  cardId: r.bId,
-                  title: r.bTitle,
-                  kind: r.kind === "blocks" ? ("blocks" as const) : ("related" as const),
-                }
-              : {
-                  cardId: r.aId,
-                  title: r.aTitle,
-                  kind: r.kind === "blocks" ? ("blocked_by" as const) : ("related" as const),
-                },
-          );
-
-      const commentCounts = cards.length
-        ? await db
-            .selectFrom("comments")
-            .where("entity_type", "=", "card")
-            .where(
-              "entity_id",
-              "in",
-              cards.map((c) => c.id),
-            )
-            .select(({ fn }) => [
-              "entity_id",
-              fn.count<number>("id").as("count"),
-            ])
-            .groupBy("entity_id")
-            .execute()
-        : [];
-
-      const cardsWithExtras = cards.map((card) => ({
-        ...card,
-        // jsonb comes back parsed; the editor wants the serialized string.
-        description:
-          card.description == null ? null : JSON.stringify(card.description),
-        assignees: assignees
-          .filter((a) => a.card_id === card.id)
-          .map((a) => ({ id: a.id, name: a.name })),
-        relations: relationsOf(card.id),
-        // count(*) is bigint → pg hands it over as a string.
-        commentCount: Number(
-          commentCounts.find((c) => c.entity_id === card.id)?.count ?? 0,
-        ),
-        attachments: attachments
-          .filter((a) => a.card_id === card.id)
-          .map((a) => ({
-            id: a.id,
-            url: fileUrl(a.path),
-            metadata: a.metadata as FileMetadata,
-          })),
-      }));
+      const cardsWithExtras = await attachCardExtras(cards, {
+        liveRelationsOnly: true,
+      });
 
       return {
         ...board,
@@ -360,17 +367,27 @@ export const boardRouter = {
     .input(z.object({ columnId: z.uuid() }))
     .handler(async (info) => {
       await assertColumnAccess(info.context.user.id, info.input.columnId);
-      // Clean up the polymorphic comments of this column's cards (no FK)
-      // before the cascade wipes the cards.
-      const cards = await db
-        .selectFrom("cards")
+      // Archive the column's live cards (snapshotting their origin) before the
+      // column goes — the FK's ON DELETE SET NULL then detaches them, so they
+      // survive in the team archive instead of cascade-deleting.
+      const origin = await db
+        .selectFrom("board_columns")
+        .innerJoin("boards", "boards.id", "board_columns.board_id")
+        .where("board_columns.id", "=", info.input.columnId)
+        .select(["boards.name as boardName", "board_columns.name as columnName"])
+        .executeTakeFirst();
+      await db
+        .updateTable("cards")
+        .set({
+          archived_at: sql`now()`,
+          archived_by: info.context.user.id,
+          archived_origin: origin
+            ? `${origin.boardName} / ${origin.columnName}`
+            : null,
+        })
         .where("column_id", "=", info.input.columnId)
-        .select("id")
+        .where("archived_at", "is", null)
         .execute();
-      await deleteCommentsOf(
-        "card",
-        cards.map((c) => c.id),
-      );
       await db
         .deleteFrom("board_columns")
         .where("id", "=", info.input.columnId)
@@ -386,10 +403,19 @@ export const boardRouter = {
     )
     .handler(async (info) => {
       await assertColumnAccess(info.context.user.id, info.input.columnId);
+      // team_id is denormalized onto the card (so the archive survives the
+      // column/board being deleted) — resolve it from the column's board.
+      const { team_id } = await db
+        .selectFrom("board_columns")
+        .innerJoin("boards", "boards.id", "board_columns.board_id")
+        .where("board_columns.id", "=", info.input.columnId)
+        .select("boards.team_id")
+        .executeTakeFirstOrThrow();
       return db
         .insertInto("cards")
         .values({
           column_id: info.input.columnId,
+          team_id,
           title: info.input.title,
           position: await nextCardPosition(info.input.columnId),
           created_by: info.context.user.id,
@@ -537,31 +563,52 @@ export const boardRouter = {
         .execute();
     }),
 
-  deleteCard: authP
+  /** Soft-delete: send a card to its team's archive. Keeps column_id so it
+   *  can be restored in place; snapshots its origin for display. Permanent
+   *  deletion lives in the archive router (`archive.purge`). */
+  archiveCard: authP
     .input(z.object({ cardId: z.uuid() }))
     .handler(async (info) => {
       await assertCardAccess(info.context.user.id, info.input.cardId);
-      await deleteCommentsOf("card", [info.input.cardId]);
-      await db.deleteFrom("cards").where("id", "=", info.input.cardId).execute();
+      const origin = await db
+        .selectFrom("cards")
+        .innerJoin("board_columns", "board_columns.id", "cards.column_id")
+        .innerJoin("boards", "boards.id", "board_columns.board_id")
+        .where("cards.id", "=", info.input.cardId)
+        .select(["boards.name as boardName", "board_columns.name as columnName"])
+        .executeTakeFirst();
+      await db
+        .updateTable("cards")
+        .set({
+          archived_at: sql`now()`,
+          archived_by: info.context.user.id,
+          archived_origin: origin
+            ? `${origin.boardName} / ${origin.columnName}`
+            : null,
+        })
+        .where("id", "=", info.input.cardId)
+        .where("archived_at", "is", null)
+        .execute();
     }),
 
   deleteBoard: authP
     .input(z.object({ boardId: z.uuid() }))
     .handler(async (info) => {
       await assertBoardAccess(info.context.user.id, info.input.boardId);
-      // Comments have no FK to cards — collect the board's card ids and
-      // clean theirs up before the cascade wipes columns/cards/attachments.
-      const cards = await db
-        .selectFrom("cards")
-        .innerJoin("board_columns", "board_columns.id", "cards.column_id")
-        .where("board_columns.board_id", "=", info.input.boardId)
-        .select("cards.id")
-        .execute();
-
-      await deleteCommentsOf(
-        "card",
-        cards.map((c) => c.id),
-      );
+      // Archive the board's live cards (origin = "<board> / <column>") before
+      // it goes. Deleting the board cascades its columns, whose ON DELETE SET
+      // NULL detaches these cards — they live on in the team archive.
+      await sql`
+        update cards
+        set archived_at = now(),
+            archived_by = ${info.context.user.id},
+            archived_origin = boards.name || ' / ' || board_columns.name
+        from board_columns, boards
+        where cards.column_id = board_columns.id
+          and board_columns.board_id = boards.id
+          and board_columns.board_id = ${info.input.boardId}
+          and cards.archived_at is null
+      `.execute(db);
 
       await db
         .deleteFrom("boards")

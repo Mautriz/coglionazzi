@@ -293,6 +293,40 @@ Postgres + a `uploads` volume for assets.
   assignees and the assignee filter. `<UserAvatar>` renders hash-colored
   initials, reused on cards and in the pickers.
 
+### Card archive
+
+- Cards are soft-deleted into a per-team archive instead of being destroyed.
+  `cards.archived_at` (null = live) marks a card archived; `cards.team_id`
+  is DENORMALIZED onto the card (set in `createCard`) so the archive survives
+  its column/board being deleted — that's why `assertCardAccess` resolves the
+  team straight off `cards.team_id` (not the old column→board→team join).
+  `cards.column_id` is nullable with `ON DELETE SET NULL` (was NOT NULL +
+  CASCADE); `archived_origin` snapshots a `"Board / Column"` label for display
+  once the origin is gone. Migration `1770000000007_card-archive`.
+- Three things archive a card: `rpc.board.archiveCard` (manual; keeps
+  `column_id` so it restores in place), and `deleteColumn` / `deleteBoard`
+  (they set `archived_at`/`archived_origin` on the live cards, then the column
+  delete's SET NULL detaches them). None of these delete the cards' comments
+  anymore — only permanent purge does.
+- `rpc.archive.*` (`src/server/orpc/archive.ts`, team-gated): `list({teamId})`
+  (archived cards, fully nested, newest-first), `restore({cardId,
+  destinationColumnId?})` (clears the archived fields; restores into the
+  original column if `column_id` survives, else requires a destination in the
+  same team), `purge({cardId})` (permanent delete of an archived card + its
+  comments — the retained hard delete), `restoreTargets({teamId})` (every
+  column of the team's boards, for the destination picker).
+- Board/search reads exclude archived cards: `board.get`'s card query +
+  relation resolution, `board.list`'s card count (conditional join), and both
+  legs of `search.global` add `archived_at IS NULL`. `attachCardExtras` in
+  `boards.ts` is the shared card-nesting helper (`liveRelationsOnly` toggles
+  whether archived counterparts show in relations) used by `board.get` and
+  `archive.list`.
+- UI: the boards sidebar has an "Archive" entry per team →
+  `routes/home/boards/archive.$teamId.tsx`, a list view (not columns) reusing
+  `cardFilters` with the same URL search params as the board. Rows open
+  `<ArchivedCardDialog>`: read-only fields + an active comment thread, footer
+  = Restore / Delete forever.
+
 ### Comments (polymorphic)
 
 - `comments(entity_type, entity_id, body jsonb, created_by, …)` attaches a

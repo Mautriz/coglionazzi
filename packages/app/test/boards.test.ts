@@ -1,6 +1,7 @@
 import { call, ORPCError } from "@orpc/server";
 import { describe, expect, it } from "vitest";
 import { db } from "../src/server/db";
+import { archiveRouter } from "../src/server/orpc/archive";
 import { boardRouter } from "../src/server/orpc/boards";
 import { commentRouter } from "../src/server/orpc/comments";
 import { createTestTeam, lexicalState, signUpTestUser } from "./helpers";
@@ -53,9 +54,12 @@ describe("board columns", () => {
     ]);
   });
 
-  it("deletes a column and its cards' comments", async () => {
+  it("deletes a column but archives its cards (comments kept)", async () => {
     const { context } = await signUpTestUser();
-    const { boardId, columnId, cardId } = await makeBoardWithCard(context);
+    const { boardId, columnId, cardId, board } = await makeBoardWithCard(
+      context,
+    );
+    const teamId = board.team_id;
     await call(
       commentRouter.add,
       { entityType: "card", entityId: cardId, body: lexicalState("hi") },
@@ -66,7 +70,12 @@ describe("board columns", () => {
 
     const after = await call(boardRouter.get, { boardId }, { context });
     expect(after.columns.map((c) => c.name)).toEqual(["Doing", "Done"]);
-    const orphans = Number(
+
+    // The card lives on in the team archive — and its comments survive.
+    const archived = await call(archiveRouter.list, { teamId }, { context });
+    expect(archived.map((c) => c.id)).toContain(cardId);
+    expect(archived.find((c) => c.id === cardId)?.commentCount).toBe(1);
+    const kept = Number(
       (
         await db
           .selectFrom("comments")
@@ -76,7 +85,7 @@ describe("board columns", () => {
           .executeTakeFirstOrThrow()
       ).c,
     );
-    expect(orphans).toBe(0);
+    expect(kept).toBe(1);
   });
 
   it("a non-member can't rename or delete a column", async () => {
@@ -228,9 +237,12 @@ describe("comments", () => {
     expect(comments).toHaveLength(0);
   });
 
-  it("deleteCard and deleteBoard clean up comments (no orphans)", async () => {
+  it("deleteBoard archives its cards into the team archive", async () => {
     const { context } = await signUpTestUser();
-    const { boardId, columnId, cardId } = await makeBoardWithCard(context);
+    const { boardId, columnId, cardId, board } = await makeBoardWithCard(
+      context,
+    );
+    const teamId = board.team_id;
     const { id: otherCard } = await call(
       boardRouter.createCard,
       { columnId, title: "other" },
@@ -244,26 +256,18 @@ describe("comments", () => {
       );
     }
 
-    // Comments are checked directly in the DB: once the host card is gone,
-    // comment.list would throw (no card to authorize against), so we assert
-    // there are no orphaned rows instead.
-    const orphanCount = async (entityId: string) =>
-      Number(
-        (
-          await db
-            .selectFrom("comments")
-            .where("entity_type", "=", "card")
-            .where("entity_id", "=", entityId)
-            .select((eb) => eb.fn.countAll().as("c"))
-            .executeTakeFirstOrThrow()
-        ).c,
-      );
-
-    await call(boardRouter.deleteCard, { cardId }, { context });
-    expect(await orphanCount(cardId)).toBe(0);
-
     await call(boardRouter.deleteBoard, { boardId }, { context });
-    expect(await orphanCount(otherCard)).toBe(0);
+
+    // Both cards land in the archive (origin detached, column_id null) and
+    // their comments are preserved.
+    const archived = await call(archiveRouter.list, { teamId }, { context });
+    expect(archived.map((c) => c.id).sort()).toEqual(
+      [cardId, otherCard].sort(),
+    );
+    for (const c of archived) {
+      expect(c.column_id).toBeNull();
+      expect(c.commentCount).toBe(1);
+    }
   });
 
   it("rejects unauthenticated callers", async () => {
