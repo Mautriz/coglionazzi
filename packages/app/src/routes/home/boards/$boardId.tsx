@@ -53,7 +53,10 @@ function RouteComponent() {
     <main className="flex w-full flex-1 flex-col gap-5 p-4 py-6">
       <h1 className="font-display text-2xl font-bold">{board.name}</h1>
 
-      <div className="flex flex-1 items-start gap-4 overflow-x-auto pb-4">
+      {/* px/pt give focus rings (3px box-shadows, clipped by the scroll
+          container on BOTH axes — overflow-x:auto forces overflow-y:auto)
+          room to render at the container edges. */}
+      <div className="flex flex-1 items-start gap-4 overflow-x-auto px-1 pt-1 pb-4">
         {board.columns.map((column) => (
           <section
             key={column.id}
