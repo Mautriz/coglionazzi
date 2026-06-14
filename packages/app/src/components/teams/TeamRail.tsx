@@ -118,10 +118,14 @@ function NewTeamBubble({ onCreated }: { onCreated?: () => void }) {
 
   const { mutate: createTeam, isPending } = useMutation(
     rpc.team.create.mutationOptions({
-      onSuccess: (team) => {
+      onSuccess: async (team) => {
         setName("");
         setOpen(false);
-        queryClient.invalidateQueries({ queryKey: rpc.team.list.key() });
+        // Await the refetch BEFORE navigating: the target team route's loader
+        // gates on `team.list` containing the team, and `ensureQueryData` would
+        // otherwise read the stale cached list (without the new team) and
+        // bounce to /home.
+        await queryClient.invalidateQueries({ queryKey: rpc.team.list.key() });
         navigate({ to: "/home/teams/$teamId", params: { teamId: team.id } });
         onCreated?.();
       },
