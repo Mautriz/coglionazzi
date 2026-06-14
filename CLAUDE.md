@@ -148,8 +148,11 @@ Postgres + a `uploads` volume for assets.
   `kysely migrate:latest` (retrying until Postgres is up — swarm ignores
   `depends_on`) then serves on `$PORT` (3000).
 - Env in `deploy/.env` (see `.env.example`): `APP_HOST`, `VITE_FRONTEND_URL`,
-  `POSTGRES_PASSWORD`, `AUTH_SECRET`. Deploy with
-  `docker compose up -d --build` from `deploy/`.
+  `POSTGRES_PASSWORD`, `AUTH_SECRET`, and (optional) `DISCORD_CLIENT_ID` /
+  `DISCORD_CLIENT_SECRET`. Every var the app needs at runtime must be listed in
+  the `app.environment:` block of `compose.yml` — a var in `.env` alone is only
+  substituted where compose references it, NOT injected into the container.
+  Deploy with `docker compose up -d --build` from `deploy/`.
 - Local smoke-test without Traefik: add an override publishing the port
   (`ports: ["8090:3000"]`) and `docker network create dokploy-network`.
 - Realtime (see Conventions → Realtime) needs nothing extra: the WebSocket

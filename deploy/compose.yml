@@ -26,6 +26,11 @@ services:
       DATABASE_URL: postgres://coglionazzi:${POSTGRES_PASSWORD}@coglionazzi-postgres:5432/coglionazzi
       AUTH_SECRET: ${AUTH_SECRET}
       VITE_FRONTEND_URL: ${VITE_FRONTEND_URL}
+      # Discord OAuth (optional). When BOTH are set the provider registers at
+      # runtime (see server/auth.ts); the `:-` default keeps compose quiet (and
+      # the provider off) when they're absent.
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       # Uploaded files (images, pdfs, …) live on the `uploads` volume.
       IMAGES_PATH: /app/uploads
     networks:
