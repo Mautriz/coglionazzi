@@ -61,6 +61,9 @@ interface RealtimeEvents {
   /** A team's support inbox changed (ticket created, status/category changed, or
    *  a new message) — subscribers refetch `support.tickets.list`. */
   support: { teamId: string };
+  /** The public game-lobby list changed (lobby created / started / finished /
+   *  reaped) — the games index refetches `game.sessions.list`. Contentless. */
+  gameLobbies: Record<string, never>;
 }
 
 /** Chat fan-out is keyed by `roomId` (NOT a single shared channel) so a
@@ -97,6 +100,11 @@ export function publishChat(roomId: string, event: ChatEvent) {
 /** Announce a team's support inbox changed (ticket list refetch). */
 export function publishSupportChanged(teamId: string) {
   publisher.publish("support", { teamId });
+}
+
+/** Announce the public game-lobby list changed (games index refetch). */
+export function publishLobbiesChanged() {
+  publisher.publish("gameLobbies", {});
 }
 
 /** Resolve a column's board and announce the board changed. */

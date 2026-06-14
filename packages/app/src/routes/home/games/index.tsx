@@ -19,6 +19,7 @@ import { NewGameDialog } from "~/components/games/NewGameDialog";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/classUtils";
 import { rpc } from "~/lib/rpcClient";
+import { useGameLobbies } from "~/lib/useRealtime";
 
 export const Route = createFileRoute("/home/games/")({
   component: RouteComponent,
@@ -37,6 +38,8 @@ function RouteComponent() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [playDeckId, setPlayDeckId] = useState<string | null>(null);
+  // New lobbies (and started/finished/reaped ones) update the list live.
+  useGameLobbies();
 
   const { mutate: createDeck, isPending } = useMutation(
     rpc.game.decks.create.mutationOptions({

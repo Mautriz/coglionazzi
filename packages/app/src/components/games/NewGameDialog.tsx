@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { GlobeIcon, LockIcon } from "lucide-react";
 import { useState } from "react";
@@ -32,14 +32,19 @@ export function NewGameDialog({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: teams } = useQuery(rpc.team.list.queryOptions());
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [teamId, setTeamId] = useState("");
 
   const { mutate: create, isPending } = useMutation(
     rpc.game.sessions.create.mutationOptions({
-      onSuccess: ({ id }) =>
-        navigate({ to: "/home/games/$sessionId", params: { sessionId: id } }),
+      onSuccess: ({ id }) => {
+        // Freshen the lobby list for when the creator returns to the index
+        // (they aren't subscribed to the live signal while on the play view).
+        queryClient.invalidateQueries({ queryKey: rpc.game.sessions.list.key() });
+        navigate({ to: "/home/games/$sessionId", params: { sessionId: id } });
+      },
       onError: (e) => toast.error(e.message),
     }),
   );

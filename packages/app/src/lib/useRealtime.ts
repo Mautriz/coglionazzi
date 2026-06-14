@@ -64,6 +64,24 @@ export function useSupportInbox(teamId: string) {
   }, [updatedAt, teamId, queryClient]);
 }
 
+/** Subscribe to the public game-lobby list and refetch `game.sessions.list`
+ *  when a lobby is created / started / finished / reaped. Mount on the games
+ *  index so new lobbies appear without a manual refresh. */
+export function useGameLobbies() {
+  const queryClient = useQueryClient();
+  const live = useQuery(
+    rpc.game.sessions.subscribeList.experimental_liveOptions({ retry: true }),
+  );
+
+  const updatedAt = live.dataUpdatedAt;
+  useEffect(() => {
+    if (!updatedAt) return;
+    queryClient.invalidateQueries({
+      queryKey: rpc.game.sessions.list.key(),
+    });
+  }, [updatedAt, queryClient]);
+}
+
 /** Live roster of who is viewing this board (deduped by user). Returns the
  *  current viewer list, updating as people join/leave. */
 export function useBoardPresence(boardId: string) {

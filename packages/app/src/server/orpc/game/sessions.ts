@@ -8,6 +8,7 @@ import {
   joinGamePresence,
   type GameEvent,
 } from "../../realtime/gamePublisher";
+import { publisher, publishLobbiesChanged } from "../../realtime/publisher";
 import { liveDeadline } from "../../realtime/versusEngine";
 import { authP } from "../base";
 import { deleteRoomsByKindOwner } from "../roomAccess";
@@ -66,6 +67,7 @@ export async function closeEmptyLobby(sessionId: string): Promise<void> {
     .where("id", "=", sessionId)
     .where("status", "=", "lobby")
     .execute();
+  publishLobbiesChanged();
 }
 
 /** `game.sessions.*` — the shared lobby lifecycle (kind-agnostic). The in-game
@@ -152,8 +154,21 @@ export const sessionRouter = {
         })
         .returning("id")
         .executeTakeFirstOrThrow();
+      publishLobbiesChanged();
       return { id };
     }),
+
+  /** Live signal that the public lobby list changed (created/started/finished/
+   *  reaped) — the games index refetches `list`. Contentless. */
+  subscribeList: authP.handler(async function* (
+    info,
+  ): AsyncGenerator<{ changed: true }> {
+    for await (const _ of publisher.subscribe("gameLobbies", {
+      signal: info.signal,
+    })) {
+      yield { changed: true };
+    }
+  }),
 
   /** Full current snapshot — lobby roster, the active matchup (with live counts
    *  + deadline), or the champion, plus the bracket so far for the results

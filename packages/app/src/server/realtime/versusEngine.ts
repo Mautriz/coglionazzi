@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { sql } from "kysely";
 import { db } from "../db";
 import { publishGame } from "./gamePublisher";
+import { publishLobbiesChanged } from "./publisher";
 
 /** The Versus bracket runs as an in-memory state machine per active session:
  *  the current matchup, live vote tallies, the frozen roster size, and a
@@ -210,6 +211,8 @@ async function finishSession(sessionId: string, winnerCardId: string | null) {
     .execute();
   engines.delete(sessionId);
   publishGame(sessionId, { type: "state" });
+  // Finished games drop off the public lobby list — refresh the games index.
+  publishLobbiesChanged();
 }
 
 /** Cast/change a vote on the current matchup. Persists + updates live tallies,

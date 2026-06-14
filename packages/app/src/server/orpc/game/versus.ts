@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { z } from "zod";
 import { db } from "../../db";
 import { gamePresenceSnapshot } from "../../realtime/gamePublisher";
+import { publishLobbiesChanged } from "../../realtime/publisher";
 import { recordVote, startVersus } from "../../realtime/versusEngine";
 import { authP } from "../base";
 import { assertSessionAccess } from "./access";
@@ -89,6 +90,8 @@ export const versusRouter = {
         .execute();
 
       await startVersus(info.input.sessionId, rosterIds.length);
+      // Lobby → Live: refresh the games index list.
+      publishLobbiesChanged();
       return { ok: true };
     }),
 
