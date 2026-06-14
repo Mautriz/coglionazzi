@@ -186,36 +186,37 @@ function RouteComponent() {
   );
 }
 
-/** Up to a 2×2 cover collage of a deck's first images. */
+/** Up to a 2×2 cover collage of a deck's first images. The OUTER box owns the
+ *  16:9 aspect + clips overflow; children fill it with `h-full` — never put the
+ *  aspect ratio on a grid whose children are `h-full` (circular height → the
+ *  natural image size wins and the card balloons). */
 function DeckPreview({ previews }: { previews: string[] }) {
-  if (previews.length === 0) {
-    return (
-      <div className="flex aspect-video items-center justify-center bg-muted">
-        <ImageIcon className="size-8 text-muted-foreground2" />
-      </div>
-    );
-  }
-  if (previews.length === 1) {
-    return (
-      <img
-        src={previews[0]}
-        alt=""
-        loading="lazy"
-        className="aspect-video w-full object-cover"
-      />
-    );
-  }
   return (
-    <div className="grid aspect-video grid-cols-2 grid-rows-2 gap-0.5 bg-muted">
-      {previews.slice(0, 4).map((url, i) => (
+    <div className="aspect-video w-full shrink-0 overflow-hidden bg-muted">
+      {previews.length === 0 ? (
+        <div className="flex h-full w-full items-center justify-center">
+          <ImageIcon className="size-8 text-muted-foreground2" />
+        </div>
+      ) : previews.length === 1 ? (
         <img
-          key={i}
-          src={url}
+          src={previews[0]}
           alt=""
           loading="lazy"
           className="h-full w-full object-cover"
         />
-      ))}
+      ) : (
+        <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5">
+          {previews.slice(0, 4).map((url, i) => (
+            <img
+              key={i}
+              src={url}
+              alt=""
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
