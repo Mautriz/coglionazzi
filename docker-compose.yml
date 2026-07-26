@@ -1,3 +1,6 @@
+# Local DEV Postgres. The database and volume are still named `coglionazzi`:
+# the app was renamed, the stored state was not (same rule as deploy/compose.yml,
+# so nobody has to touch their gitignored packages/.env).
 services:
   postgres:
     image: postgres:18

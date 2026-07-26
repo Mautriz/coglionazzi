@@ -1,4 +1,4 @@
-# coglionazzi.com
+# Insacco
 
 A just-for-fun app for a Discord friend group: games, puzzles, rankings —
 whatever we feel like building. Tone is playful; quality bar is real
@@ -63,14 +63,19 @@ packages/
         │   ├── __root.tsx         # head, theme init script, session beforeLoad
         │   ├── index.tsx          # redirects to /home or /auth/login
         │   ├── auth/              # public: route.tsx layout + login + sign-up
-        │   ├── home/              # protected: route.tsx = guard + topbar (sections nav)
-        │   │   ├── index.tsx      # Home = global chat only
-        │   │   ├── demo.tsx       # playground: editor + file uploads
-        │   │   ├── games/         # global Versus game: index (lobbies+decks),
-        │   │   │                  #   decks/$deckId/{index editor, stats}, $sessionId play
-        │   │   └── teams/         # Teams section: route.tsx = TeamRail (rail lives
-        │   │       │              #   ONLY here), index → first team, $teamId/
+        │   ├── home/              # THE app = Teams. route.tsx = guard + AppShell,
+        │   │   │                  #   NO section nav (Teams owns the screen)
+        │   │   ├── index.tsx      # /home → redirect to /home/teams
+        │   │   └── teams/         # route.tsx = TeamRail (rail lives ONLY here),
+        │   │       │              #   index → first team, $teamId/
         │   │       │              #   (route.tsx = TeamPanel) → board/chat/archive
+        │   ├── play/              # secondary area, reached BY URL ONLY (no link in
+        │   │   │                  #   from Teams). route.tsx = guard + AppShell WITH
+        │   │   │                  #   the section nav (Chat/Games/Demo)
+        │   │   ├── index.tsx      # /play = global chat
+        │   │   ├── demo.tsx       # playground: editor + file uploads
+        │   │   └── games/         # global Versus game: index (lobbies+decks),
+        │   │                      #   decks/$deckId/{index editor, stats}, $sessionId play
         │   ├── widget.tsx        # public (no-auth) support widget — iframe content
         │   └── api/
         │       ├── auth/$.ts      # better-auth handler (GET/POST)
@@ -116,7 +121,7 @@ packages/
         │   ├── ui/                # shadcn components (add via shadcn CLI)
         │   ├── teams/             # TeamRail (global bubble rail) + TeamPanel
         │   ├── games/             # NewGameDialog (create a Versus session)
-        │   └── custom/            # AppForm, Logo, TeamAvatar, app-specific
+        │   └── custom/            # AppShell (topbar+content), AppForm, Logo, …
         └── styles/app.css         # the ONLY Tailwind/theme config (v4 CSS-first)
 ```
 
@@ -137,6 +142,15 @@ Production runs as a Docker stack under dokploy/Traefik (same shape as
 `../propanalyst/deploy`), trimmed to what this app needs: the app + its own
 Postgres + a `uploads` volume for assets.
 
+- **Naming:** the app is Insacco, but every identifier that names STORED STATE
+  or how to reach it is still `coglionazzi` — the Postgres role/database, the
+  `coglionazzi-postgres` container host in `DATABASE_URL`, the
+  `coglionazzi-pg-data` / `coglionazzi-uploads` volumes, and (same rule, so no
+  local `.env` edits) the dev database + its `coglionazzi_test` companion.
+  Renaming them in place would boot the app against a role/database that
+  doesn't exist — `initdb` only runs on an empty data dir — and orphan live
+  data behind a fresh volume. Pure labels (Traefik routers/services, the
+  `insacco-internal` network) WERE renamed. Keep that split.
 - `deploy/compose.yml` — `app` (built from `packages/app/Dockerfile`) +
   `postgres` (bundled, `coglionazzi-pg-data` volume) + `coglionazzi-uploads`
   volume. The app joins the external `dokploy-network` (Traefik routes to it
@@ -254,7 +268,7 @@ Postgres + a `uploads` volume for assets.
 - Use `<RichTextEditor />` from `~/components/editor/RichTextEditor` for any
   formatted-text feature. It's uncontrolled: pass `onChange` to receive the
   serialized editor-state JSON (persist that string) and `initialState` to
-  restore it. Demo on `/home`.
+  restore it. Demo on `/play/demo`.
 - Keyboard submit: pass `onSubmit` to fire on ⌘/Ctrl+Enter (Shift/bare Enter
   = newline). Implemented by `components/editor/SubmitPlugin.tsx`. NEVER use
   bare Enter to send — `<MessageComposer>` (the one shared composer for
@@ -305,7 +319,7 @@ Postgres + a `uploads` volume for assets.
   cards' rooms; no FK on `owner_id`). Membership/board-set changes publish on
   the `team` realtime channel (see Realtime).
 - UI is team-centric (Discord-shaped): a global `<TeamRail>` of team "bubbles"
-  (far-left, in the `/home` shell) switches teams; selecting one opens its
+  (far-left, in the Teams shell) switches teams; selecting one opens its
   `<TeamPanel>` (second column) with that team's boards (+ inline "Add board"),
   Chat, Archive and a stubbed Games slot. `<TeamAvatar>` = square hash-colored
   initials (the team sibling of round `<UserAvatar>`). `TeamDialog` (gear in the
@@ -359,19 +373,24 @@ Postgres + a `uploads` volume for assets.
   via the upload helpers, a `<MessageThread>` card discussion at the bottom —
   see Chat rooms & messages). Archiving a card KEEPS its room/messages; only
   `archive.purge` deletes them (`deleteCardRooms`).
-- Navigation chrome: the global topbar carries the app **sections** (Home /
-  Teams / Games / Demo) + `UserActions` (theme + logout). **Home** is the global
-  chat only. The `<TeamRail>` (team bubbles) lives ONLY in the Teams section
-  (`routes/home/teams/route.tsx`); the `<TeamPanel>` (second column) is added by
-  `routes/home/teams/$teamId/route.tsx` and holds the global `<SearchBox>`
+- Navigation chrome: `<AppShell>` (`components/custom/AppShell.tsx`) is the
+  topbar + scrolling content area shared by BOTH protected shells. Nav is a
+  SLOT, not a feature of the shell: `/home` (Teams) passes **none** — Teams is
+  the app, so the header is only Logo + `<ConnectedUsersCount>` +
+  `UserActions` — while `/play` passes its own `SectionNav`/`SectionMenu`.
+  Each caller keeps its `to`s literal (`as const`) so typed links still check.
+  The `<TeamRail>` (team bubbles — no "home" bubble, Teams IS home) lives ONLY
+  in `routes/home/teams/route.tsx`; the `<TeamPanel>` (second column) is added
+  by `routes/home/teams/$teamId/route.tsx` and holds the global `<SearchBox>`
   (deliberately NOT in the topbar), the team's boards + spaces, and — when a
   board OR the archive is open — that view's filters.
 - **Mobile / responsive** (breakpoint = Tailwind `md`, 768px). Everything must
   fit a ~390px viewport: a horizontal overflow anywhere triggers mobile
   Chrome's shrink-to-fit and zooms the WHOLE app out, so keep wide rows
-  responsive. The topbar collapses below `md`: the section nav becomes a
-  `DropdownMenu` hamburger (`SectionMenu` in `routes/home/route.tsx`), the Logo
-  wordmark hides (`textClassName="hidden sm:inline"`), and `UserActions` goes
+  responsive. The topbar collapses below `md`: in `/play` the section nav
+  becomes a `DropdownMenu` hamburger (`SectionMenu` in `routes/play/route.tsx`;
+  Teams has no nav to collapse), the Logo wordmark hides
+  (`textClassName="hidden sm:inline"`), and `UserActions` goes
   compact (BrandPicker hidden, icon-only logout). The Teams `<TeamRail>` +
   `<TeamPanel>` are desktop sidebars (`max-md:hidden`) AND render inside a
   left **Sheet** drawer on mobile, opened from `TeamsMobileBar`
@@ -472,7 +491,7 @@ Postgres + a `uploads` volume for assets.
   NEVER bare Enter), `<MessageItem>` (body + reactions + author edit/delete),
   and `useChatRoom` (`lib/useChatRoom.ts`) which seeds from `chat.open`,
   streams live (see Realtime), and pages history. The global room is on the
-  home page (`routes/home/index.tsx`); each team's room is the Chat space in
+  `/play` page (`routes/play/index.tsx`); each team's room is the Chat space in
   its panel (`routes/home/teams/$teamId/chat.tsx`).
 - Gotcha: jsonb columns come back from pg as parsed objects — serialize
   with `JSON.stringify` when returning editor states to the client (the
@@ -494,7 +513,7 @@ Postgres + a `uploads` volume for assets.
 ### Games (Versus + the game framework)
 
 - A small **game framework** (global, NOT team-scoped) under
-  `src/server/orpc/game/` + `routes/home/games/`, designed for many games. Layers:
+  `src/server/orpc/game/` + `routes/play/games/`, designed for many games. Layers:
   a shared **deck** (reusable image set), a shared **session** (lobby lifecycle),
   and a per-game **module** (only `versus` today; future `rating`/`tierlist` add
   their own tables + module against the SAME deck/session/presence shell).
@@ -546,15 +565,15 @@ Postgres + a `uploads` volume for assets.
   from `sessions.get` and applies them: high-frequency `votes` stream as deltas
   (live counts + deadline), low-frequency `state` (matchup opened/resolved/
   finished) is signal-and-refetch, `presence` is the live roster.
-- UI: `/home/games` (topbar **Games** link) lists open lobbies + decks;
+- UI: `/play/games` (the Games link in the `/play` nav) lists open lobbies + decks;
   `decks/$deckId` is the editor (+ Play → `<NewGameDialog>`); `$sessionId` is the
   play view (lobby → live matchup voting → champion + results) — a two-column
   layout (game + a persistent **`<MessageThread roomRef={{scope:'game',
   sessionId}}>`** chat that carries across all three states; stacks under the
   game on mobile). New game = new `*_` tables + a realtime engine + a
   `game.<kind>.*` module; reuse decks/sessions/presence.
-- Layout width: the topbar-shell content pages (home chat, demo, a game
-  session, team chat, deck stats) fill the viewport with `px-4 … lg:px-8`
+- Layout width: the topbar-shell content pages (the `/play` global chat, demo,
+  a game session, team chat, deck stats) fill the viewport with `px-4 … lg:px-8`
   padding — NOT a narrow centered `max-w-*` (deliberately edge-filling per
   preference). Only intrinsically-focused bits keep a cap (the versus duel's
   two portrait images, `max-w-2xl`, so they don't balloon on wide screens).

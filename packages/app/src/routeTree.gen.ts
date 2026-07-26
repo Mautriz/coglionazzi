@@ -10,18 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WidgetRouteImport } from './routes/widget'
+import { Route as PlayRouteRouteImport } from './routes/play/route'
 import { Route as HomeRouteRouteImport } from './routes/home/route'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PlayIndexRouteImport } from './routes/play/index'
 import { Route as HomeIndexRouteImport } from './routes/home/index'
-import { Route as HomeDemoRouteImport } from './routes/home/demo'
+import { Route as PlayDemoRouteImport } from './routes/play/demo'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as HomeTeamsRouteRouteImport } from './routes/home/teams/route'
+import { Route as PlayGamesIndexRouteImport } from './routes/play/games/index'
 import { Route as HomeTeamsIndexRouteImport } from './routes/home/teams/index'
-import { Route as HomeGamesIndexRouteImport } from './routes/home/games/index'
-import { Route as HomeGamesSessionIdRouteImport } from './routes/home/games/$sessionId'
+import { Route as PlayGamesSessionIdRouteImport } from './routes/play/games/$sessionId'
 import { Route as ApiSupportTicketsRouteImport } from './routes/api/support/tickets'
 import { Route as ApiSupportStreamRouteImport } from './routes/api/support/stream'
 import { Route as ApiSupportMessagesRouteImport } from './routes/api/support/messages'
@@ -33,13 +35,18 @@ import { Route as HomeTeamsTeamIdIndexRouteImport } from './routes/home/teams/$t
 import { Route as HomeTeamsTeamIdSupportRouteImport } from './routes/home/teams/$teamId/support'
 import { Route as HomeTeamsTeamIdChatRouteImport } from './routes/home/teams/$teamId/chat'
 import { Route as HomeTeamsTeamIdArchiveRouteImport } from './routes/home/teams/$teamId/archive'
-import { Route as HomeGamesDecksDeckIdIndexRouteImport } from './routes/home/games/decks/$deckId/index'
+import { Route as PlayGamesDecksDeckIdIndexRouteImport } from './routes/play/games/decks/$deckId/index'
+import { Route as PlayGamesDecksDeckIdStatsRouteImport } from './routes/play/games/decks/$deckId/stats'
 import { Route as HomeTeamsTeamIdBoardBoardIdRouteImport } from './routes/home/teams/$teamId/board.$boardId'
-import { Route as HomeGamesDecksDeckIdStatsRouteImport } from './routes/home/games/decks/$deckId/stats'
 
 const WidgetRoute = WidgetRouteImport.update({
   id: '/widget',
   path: '/widget',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlayRouteRoute = PlayRouteRouteImport.update({
+  id: '/play',
+  path: '/play',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HomeRouteRoute = HomeRouteRouteImport.update({
@@ -57,15 +64,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlayIndexRoute = PlayIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PlayRouteRoute,
+} as any)
 const HomeIndexRoute = HomeIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => HomeRouteRoute,
 } as any)
-const HomeDemoRoute = HomeDemoRouteImport.update({
+const PlayDemoRoute = PlayDemoRouteImport.update({
   id: '/demo',
   path: '/demo',
-  getParentRoute: () => HomeRouteRoute,
+  getParentRoute: () => PlayRouteRoute,
 } as any)
 const AuthSignUpRoute = AuthSignUpRouteImport.update({
   id: '/sign-up',
@@ -87,20 +99,20 @@ const HomeTeamsRouteRoute = HomeTeamsRouteRouteImport.update({
   path: '/teams',
   getParentRoute: () => HomeRouteRoute,
 } as any)
+const PlayGamesIndexRoute = PlayGamesIndexRouteImport.update({
+  id: '/games/',
+  path: '/games/',
+  getParentRoute: () => PlayRouteRoute,
+} as any)
 const HomeTeamsIndexRoute = HomeTeamsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => HomeTeamsRouteRoute,
 } as any)
-const HomeGamesIndexRoute = HomeGamesIndexRouteImport.update({
-  id: '/games/',
-  path: '/games/',
-  getParentRoute: () => HomeRouteRoute,
-} as any)
-const HomeGamesSessionIdRoute = HomeGamesSessionIdRouteImport.update({
+const PlayGamesSessionIdRoute = PlayGamesSessionIdRouteImport.update({
   id: '/games/$sessionId',
   path: '/games/$sessionId',
-  getParentRoute: () => HomeRouteRoute,
+  getParentRoute: () => PlayRouteRoute,
 } as any)
 const ApiSupportTicketsRoute = ApiSupportTicketsRouteImport.update({
   id: '/api/support/tickets',
@@ -157,11 +169,17 @@ const HomeTeamsTeamIdArchiveRoute = HomeTeamsTeamIdArchiveRouteImport.update({
   path: '/archive',
   getParentRoute: () => HomeTeamsTeamIdRouteRoute,
 } as any)
-const HomeGamesDecksDeckIdIndexRoute =
-  HomeGamesDecksDeckIdIndexRouteImport.update({
+const PlayGamesDecksDeckIdIndexRoute =
+  PlayGamesDecksDeckIdIndexRouteImport.update({
     id: '/games/decks/$deckId/',
     path: '/games/decks/$deckId/',
-    getParentRoute: () => HomeRouteRoute,
+    getParentRoute: () => PlayRouteRoute,
+  } as any)
+const PlayGamesDecksDeckIdStatsRoute =
+  PlayGamesDecksDeckIdStatsRouteImport.update({
+    id: '/games/decks/$deckId/stats',
+    path: '/games/decks/$deckId/stats',
+    getParentRoute: () => PlayRouteRoute,
   } as any)
 const HomeTeamsTeamIdBoardBoardIdRoute =
   HomeTeamsTeamIdBoardBoardIdRouteImport.update({
@@ -169,24 +187,20 @@ const HomeTeamsTeamIdBoardBoardIdRoute =
     path: '/board/$boardId',
     getParentRoute: () => HomeTeamsTeamIdRouteRoute,
   } as any)
-const HomeGamesDecksDeckIdStatsRoute =
-  HomeGamesDecksDeckIdStatsRouteImport.update({
-    id: '/games/decks/$deckId/stats',
-    path: '/games/decks/$deckId/stats',
-    getParentRoute: () => HomeRouteRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
   '/home': typeof HomeRouteRouteWithChildren
+  '/play': typeof PlayRouteRouteWithChildren
   '/widget': typeof WidgetRoute
   '/home/teams': typeof HomeTeamsRouteRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
-  '/home/demo': typeof HomeDemoRoute
+  '/play/demo': typeof PlayDemoRoute
   '/home/': typeof HomeIndexRoute
+  '/play/': typeof PlayIndexRoute
   '/home/teams/$teamId': typeof HomeTeamsTeamIdRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
@@ -194,16 +208,16 @@ export interface FileRoutesByFullPath {
   '/api/support/messages': typeof ApiSupportMessagesRoute
   '/api/support/stream': typeof ApiSupportStreamRoute
   '/api/support/tickets': typeof ApiSupportTicketsRoute
-  '/home/games/$sessionId': typeof HomeGamesSessionIdRoute
-  '/home/games/': typeof HomeGamesIndexRoute
+  '/play/games/$sessionId': typeof PlayGamesSessionIdRoute
   '/home/teams/': typeof HomeTeamsIndexRoute
+  '/play/games/': typeof PlayGamesIndexRoute
   '/home/teams/$teamId/archive': typeof HomeTeamsTeamIdArchiveRoute
   '/home/teams/$teamId/chat': typeof HomeTeamsTeamIdChatRoute
   '/home/teams/$teamId/support': typeof HomeTeamsTeamIdSupportRoute
   '/home/teams/$teamId/': typeof HomeTeamsTeamIdIndexRoute
-  '/home/games/decks/$deckId/stats': typeof HomeGamesDecksDeckIdStatsRoute
   '/home/teams/$teamId/board/$boardId': typeof HomeTeamsTeamIdBoardBoardIdRoute
-  '/home/games/decks/$deckId/': typeof HomeGamesDecksDeckIdIndexRoute
+  '/play/games/decks/$deckId/stats': typeof PlayGamesDecksDeckIdStatsRoute
+  '/play/games/decks/$deckId/': typeof PlayGamesDecksDeckIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -212,37 +226,40 @@ export interface FileRoutesByTo {
   '/api/files': typeof ApiFilesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
-  '/home/demo': typeof HomeDemoRoute
+  '/play/demo': typeof PlayDemoRoute
   '/home': typeof HomeIndexRoute
+  '/play': typeof PlayIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/api/support/config': typeof ApiSupportConfigRoute
   '/api/support/messages': typeof ApiSupportMessagesRoute
   '/api/support/stream': typeof ApiSupportStreamRoute
   '/api/support/tickets': typeof ApiSupportTicketsRoute
-  '/home/games/$sessionId': typeof HomeGamesSessionIdRoute
-  '/home/games': typeof HomeGamesIndexRoute
+  '/play/games/$sessionId': typeof PlayGamesSessionIdRoute
   '/home/teams': typeof HomeTeamsIndexRoute
+  '/play/games': typeof PlayGamesIndexRoute
   '/home/teams/$teamId/archive': typeof HomeTeamsTeamIdArchiveRoute
   '/home/teams/$teamId/chat': typeof HomeTeamsTeamIdChatRoute
   '/home/teams/$teamId/support': typeof HomeTeamsTeamIdSupportRoute
   '/home/teams/$teamId': typeof HomeTeamsTeamIdIndexRoute
-  '/home/games/decks/$deckId/stats': typeof HomeGamesDecksDeckIdStatsRoute
   '/home/teams/$teamId/board/$boardId': typeof HomeTeamsTeamIdBoardBoardIdRoute
-  '/home/games/decks/$deckId': typeof HomeGamesDecksDeckIdIndexRoute
+  '/play/games/decks/$deckId/stats': typeof PlayGamesDecksDeckIdStatsRoute
+  '/play/games/decks/$deckId': typeof PlayGamesDecksDeckIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
   '/home': typeof HomeRouteRouteWithChildren
+  '/play': typeof PlayRouteRouteWithChildren
   '/widget': typeof WidgetRoute
   '/home/teams': typeof HomeTeamsRouteRouteWithChildren
   '/api/files': typeof ApiFilesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
-  '/home/demo': typeof HomeDemoRoute
+  '/play/demo': typeof PlayDemoRoute
   '/home/': typeof HomeIndexRoute
+  '/play/': typeof PlayIndexRoute
   '/home/teams/$teamId': typeof HomeTeamsTeamIdRouteRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
@@ -250,16 +267,16 @@ export interface FileRoutesById {
   '/api/support/messages': typeof ApiSupportMessagesRoute
   '/api/support/stream': typeof ApiSupportStreamRoute
   '/api/support/tickets': typeof ApiSupportTicketsRoute
-  '/home/games/$sessionId': typeof HomeGamesSessionIdRoute
-  '/home/games/': typeof HomeGamesIndexRoute
+  '/play/games/$sessionId': typeof PlayGamesSessionIdRoute
   '/home/teams/': typeof HomeTeamsIndexRoute
+  '/play/games/': typeof PlayGamesIndexRoute
   '/home/teams/$teamId/archive': typeof HomeTeamsTeamIdArchiveRoute
   '/home/teams/$teamId/chat': typeof HomeTeamsTeamIdChatRoute
   '/home/teams/$teamId/support': typeof HomeTeamsTeamIdSupportRoute
   '/home/teams/$teamId/': typeof HomeTeamsTeamIdIndexRoute
-  '/home/games/decks/$deckId/stats': typeof HomeGamesDecksDeckIdStatsRoute
   '/home/teams/$teamId/board/$boardId': typeof HomeTeamsTeamIdBoardBoardIdRoute
-  '/home/games/decks/$deckId/': typeof HomeGamesDecksDeckIdIndexRoute
+  '/play/games/decks/$deckId/stats': typeof PlayGamesDecksDeckIdStatsRoute
+  '/play/games/decks/$deckId/': typeof PlayGamesDecksDeckIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -267,13 +284,15 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/home'
+    | '/play'
     | '/widget'
     | '/home/teams'
     | '/api/files'
     | '/auth/login'
     | '/auth/sign-up'
-    | '/home/demo'
+    | '/play/demo'
     | '/home/'
+    | '/play/'
     | '/home/teams/$teamId'
     | '/api/auth/$'
     | '/api/rpc/$'
@@ -281,16 +300,16 @@ export interface FileRouteTypes {
     | '/api/support/messages'
     | '/api/support/stream'
     | '/api/support/tickets'
-    | '/home/games/$sessionId'
-    | '/home/games/'
+    | '/play/games/$sessionId'
     | '/home/teams/'
+    | '/play/games/'
     | '/home/teams/$teamId/archive'
     | '/home/teams/$teamId/chat'
     | '/home/teams/$teamId/support'
     | '/home/teams/$teamId/'
-    | '/home/games/decks/$deckId/stats'
     | '/home/teams/$teamId/board/$boardId'
-    | '/home/games/decks/$deckId/'
+    | '/play/games/decks/$deckId/stats'
+    | '/play/games/decks/$deckId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -299,36 +318,39 @@ export interface FileRouteTypes {
     | '/api/files'
     | '/auth/login'
     | '/auth/sign-up'
-    | '/home/demo'
+    | '/play/demo'
     | '/home'
+    | '/play'
     | '/api/auth/$'
     | '/api/rpc/$'
     | '/api/support/config'
     | '/api/support/messages'
     | '/api/support/stream'
     | '/api/support/tickets'
-    | '/home/games/$sessionId'
-    | '/home/games'
+    | '/play/games/$sessionId'
     | '/home/teams'
+    | '/play/games'
     | '/home/teams/$teamId/archive'
     | '/home/teams/$teamId/chat'
     | '/home/teams/$teamId/support'
     | '/home/teams/$teamId'
-    | '/home/games/decks/$deckId/stats'
     | '/home/teams/$teamId/board/$boardId'
-    | '/home/games/decks/$deckId'
+    | '/play/games/decks/$deckId/stats'
+    | '/play/games/decks/$deckId'
   id:
     | '__root__'
     | '/'
     | '/auth'
     | '/home'
+    | '/play'
     | '/widget'
     | '/home/teams'
     | '/api/files'
     | '/auth/login'
     | '/auth/sign-up'
-    | '/home/demo'
+    | '/play/demo'
     | '/home/'
+    | '/play/'
     | '/home/teams/$teamId'
     | '/api/auth/$'
     | '/api/rpc/$'
@@ -336,22 +358,23 @@ export interface FileRouteTypes {
     | '/api/support/messages'
     | '/api/support/stream'
     | '/api/support/tickets'
-    | '/home/games/$sessionId'
-    | '/home/games/'
+    | '/play/games/$sessionId'
     | '/home/teams/'
+    | '/play/games/'
     | '/home/teams/$teamId/archive'
     | '/home/teams/$teamId/chat'
     | '/home/teams/$teamId/support'
     | '/home/teams/$teamId/'
-    | '/home/games/decks/$deckId/stats'
     | '/home/teams/$teamId/board/$boardId'
-    | '/home/games/decks/$deckId/'
+    | '/play/games/decks/$deckId/stats'
+    | '/play/games/decks/$deckId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
   HomeRouteRoute: typeof HomeRouteRouteWithChildren
+  PlayRouteRoute: typeof PlayRouteRouteWithChildren
   WidgetRoute: typeof WidgetRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -369,6 +392,13 @@ declare module '@tanstack/react-router' {
       path: '/widget'
       fullPath: '/widget'
       preLoaderRoute: typeof WidgetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/play': {
+      id: '/play'
+      path: '/play'
+      fullPath: '/play'
+      preLoaderRoute: typeof PlayRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/home': {
@@ -392,6 +422,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/play/': {
+      id: '/play/'
+      path: '/'
+      fullPath: '/play/'
+      preLoaderRoute: typeof PlayIndexRouteImport
+      parentRoute: typeof PlayRouteRoute
+    }
     '/home/': {
       id: '/home/'
       path: '/'
@@ -399,12 +436,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HomeIndexRouteImport
       parentRoute: typeof HomeRouteRoute
     }
-    '/home/demo': {
-      id: '/home/demo'
+    '/play/demo': {
+      id: '/play/demo'
       path: '/demo'
-      fullPath: '/home/demo'
-      preLoaderRoute: typeof HomeDemoRouteImport
-      parentRoute: typeof HomeRouteRoute
+      fullPath: '/play/demo'
+      preLoaderRoute: typeof PlayDemoRouteImport
+      parentRoute: typeof PlayRouteRoute
     }
     '/auth/sign-up': {
       id: '/auth/sign-up'
@@ -434,6 +471,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HomeTeamsRouteRouteImport
       parentRoute: typeof HomeRouteRoute
     }
+    '/play/games/': {
+      id: '/play/games/'
+      path: '/games'
+      fullPath: '/play/games/'
+      preLoaderRoute: typeof PlayGamesIndexRouteImport
+      parentRoute: typeof PlayRouteRoute
+    }
     '/home/teams/': {
       id: '/home/teams/'
       path: '/'
@@ -441,19 +485,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HomeTeamsIndexRouteImport
       parentRoute: typeof HomeTeamsRouteRoute
     }
-    '/home/games/': {
-      id: '/home/games/'
-      path: '/games'
-      fullPath: '/home/games/'
-      preLoaderRoute: typeof HomeGamesIndexRouteImport
-      parentRoute: typeof HomeRouteRoute
-    }
-    '/home/games/$sessionId': {
-      id: '/home/games/$sessionId'
+    '/play/games/$sessionId': {
+      id: '/play/games/$sessionId'
       path: '/games/$sessionId'
-      fullPath: '/home/games/$sessionId'
-      preLoaderRoute: typeof HomeGamesSessionIdRouteImport
-      parentRoute: typeof HomeRouteRoute
+      fullPath: '/play/games/$sessionId'
+      preLoaderRoute: typeof PlayGamesSessionIdRouteImport
+      parentRoute: typeof PlayRouteRoute
     }
     '/api/support/tickets': {
       id: '/api/support/tickets'
@@ -532,12 +569,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HomeTeamsTeamIdArchiveRouteImport
       parentRoute: typeof HomeTeamsTeamIdRouteRoute
     }
-    '/home/games/decks/$deckId/': {
-      id: '/home/games/decks/$deckId/'
+    '/play/games/decks/$deckId/': {
+      id: '/play/games/decks/$deckId/'
       path: '/games/decks/$deckId'
-      fullPath: '/home/games/decks/$deckId/'
-      preLoaderRoute: typeof HomeGamesDecksDeckIdIndexRouteImport
-      parentRoute: typeof HomeRouteRoute
+      fullPath: '/play/games/decks/$deckId/'
+      preLoaderRoute: typeof PlayGamesDecksDeckIdIndexRouteImport
+      parentRoute: typeof PlayRouteRoute
+    }
+    '/play/games/decks/$deckId/stats': {
+      id: '/play/games/decks/$deckId/stats'
+      path: '/games/decks/$deckId/stats'
+      fullPath: '/play/games/decks/$deckId/stats'
+      preLoaderRoute: typeof PlayGamesDecksDeckIdStatsRouteImport
+      parentRoute: typeof PlayRouteRoute
     }
     '/home/teams/$teamId/board/$boardId': {
       id: '/home/teams/$teamId/board/$boardId'
@@ -545,13 +589,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/home/teams/$teamId/board/$boardId'
       preLoaderRoute: typeof HomeTeamsTeamIdBoardBoardIdRouteImport
       parentRoute: typeof HomeTeamsTeamIdRouteRoute
-    }
-    '/home/games/decks/$deckId/stats': {
-      id: '/home/games/decks/$deckId/stats'
-      path: '/games/decks/$deckId/stats'
-      fullPath: '/home/games/decks/$deckId/stats'
-      preLoaderRoute: typeof HomeGamesDecksDeckIdStatsRouteImport
-      parentRoute: typeof HomeRouteRoute
     }
   }
 }
@@ -605,32 +642,45 @@ const HomeTeamsRouteRouteWithChildren = HomeTeamsRouteRoute._addFileChildren(
 
 interface HomeRouteRouteChildren {
   HomeTeamsRouteRoute: typeof HomeTeamsRouteRouteWithChildren
-  HomeDemoRoute: typeof HomeDemoRoute
   HomeIndexRoute: typeof HomeIndexRoute
-  HomeGamesSessionIdRoute: typeof HomeGamesSessionIdRoute
-  HomeGamesIndexRoute: typeof HomeGamesIndexRoute
-  HomeGamesDecksDeckIdStatsRoute: typeof HomeGamesDecksDeckIdStatsRoute
-  HomeGamesDecksDeckIdIndexRoute: typeof HomeGamesDecksDeckIdIndexRoute
 }
 
 const HomeRouteRouteChildren: HomeRouteRouteChildren = {
   HomeTeamsRouteRoute: HomeTeamsRouteRouteWithChildren,
-  HomeDemoRoute: HomeDemoRoute,
   HomeIndexRoute: HomeIndexRoute,
-  HomeGamesSessionIdRoute: HomeGamesSessionIdRoute,
-  HomeGamesIndexRoute: HomeGamesIndexRoute,
-  HomeGamesDecksDeckIdStatsRoute: HomeGamesDecksDeckIdStatsRoute,
-  HomeGamesDecksDeckIdIndexRoute: HomeGamesDecksDeckIdIndexRoute,
 }
 
 const HomeRouteRouteWithChildren = HomeRouteRoute._addFileChildren(
   HomeRouteRouteChildren,
 )
 
+interface PlayRouteRouteChildren {
+  PlayDemoRoute: typeof PlayDemoRoute
+  PlayIndexRoute: typeof PlayIndexRoute
+  PlayGamesSessionIdRoute: typeof PlayGamesSessionIdRoute
+  PlayGamesIndexRoute: typeof PlayGamesIndexRoute
+  PlayGamesDecksDeckIdStatsRoute: typeof PlayGamesDecksDeckIdStatsRoute
+  PlayGamesDecksDeckIdIndexRoute: typeof PlayGamesDecksDeckIdIndexRoute
+}
+
+const PlayRouteRouteChildren: PlayRouteRouteChildren = {
+  PlayDemoRoute: PlayDemoRoute,
+  PlayIndexRoute: PlayIndexRoute,
+  PlayGamesSessionIdRoute: PlayGamesSessionIdRoute,
+  PlayGamesIndexRoute: PlayGamesIndexRoute,
+  PlayGamesDecksDeckIdStatsRoute: PlayGamesDecksDeckIdStatsRoute,
+  PlayGamesDecksDeckIdIndexRoute: PlayGamesDecksDeckIdIndexRoute,
+}
+
+const PlayRouteRouteWithChildren = PlayRouteRoute._addFileChildren(
+  PlayRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRouteRoute: AuthRouteRouteWithChildren,
   HomeRouteRoute: HomeRouteRouteWithChildren,
+  PlayRouteRoute: PlayRouteRouteWithChildren,
   WidgetRoute: WidgetRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

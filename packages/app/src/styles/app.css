@@ -5,7 +5,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ────────────────────────────────────────────────────────────────────────
- * Coglionazzi theme — PropFirmHub-style "electric cyan" brand.
+ * Insacco theme — PropFirmHub-style "electric cyan" brand.
  * The @theme defaults ARE the dark palette ("deep-sea electric cyan"), so
  * dark is the default look; the `.light` block flips to the near-white
  * ice-cyan palette. The theme init script always puts `light`/`dark` on

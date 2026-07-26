@@ -21,7 +21,7 @@ import { cn } from "~/lib/classUtils";
 import { rpc } from "~/lib/rpcClient";
 import { useGameLobbies } from "~/lib/useRealtime";
 
-export const Route = createFileRoute("/home/games/")({
+export const Route = createFileRoute("/play/games/")({
   component: RouteComponent,
   loader: ({ context }) =>
     Promise.all([
@@ -45,7 +45,7 @@ function RouteComponent() {
     rpc.game.decks.create.mutationOptions({
       onSuccess: ({ id }) => {
         queryClient.invalidateQueries({ queryKey: rpc.game.decks.list.key() });
-        navigate({ to: "/home/games/decks/$deckId", params: { deckId: id } });
+        navigate({ to: "/play/games/decks/$deckId", params: { deckId: id } });
       },
     }),
   );
@@ -71,7 +71,7 @@ function RouteComponent() {
             {lobbies.map((s) => (
               <Link
                 key={s.id}
-                to="/home/games/$sessionId"
+                to="/play/games/$sessionId"
                 params={{ sessionId: s.id }}
                 className="flex items-center gap-3 rounded-lg border border-card-border bg-card-background px-4 py-3 transition-colors hover:border-primary/40"
               >
@@ -137,7 +137,7 @@ function RouteComponent() {
                 className="group flex flex-col overflow-hidden rounded-xl border border-card-border bg-card-background transition-colors hover:border-primary/40"
               >
                 <Link
-                  to="/home/games/decks/$deckId"
+                  to="/play/games/decks/$deckId"
                   params={{ deckId: deck.id }}
                   className="flex flex-col"
                 >

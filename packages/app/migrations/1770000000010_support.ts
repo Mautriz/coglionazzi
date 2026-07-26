@@ -52,7 +52,7 @@ export async function up(db: Kysely<any>): Promise<void> {
         .defaultTo("open")
         .check(sql`status in ('open', 'resolved')`),
     )
-    // The logged-in coglionazzi user who opened it (in-app path), if any.
+    // The logged-in Insacco user who opened it (in-app path), if any.
     .addColumn("requester_user_id", "text", (c) =>
       c.references("users.id").onDelete("set null"),
     )

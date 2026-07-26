@@ -1,11 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Link,
-  useLocation,
-  useNavigate,
-  useParams,
-} from "@tanstack/react-router";
-import { HomeIcon, PlusIcon } from "lucide-react";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { TeamAvatar } from "~/components/custom/TeamAvatar";
 import {
@@ -18,10 +13,10 @@ import { cn } from "~/lib/classUtils";
 import { rpc } from "~/lib/rpcClient";
 import { useWorkspaceRealtime } from "~/lib/useRealtime";
 
-/** Discord-style far-left rail of team "bubbles", visible across the whole
- *  protected area (mounted by the /home shell). Top = Home (global chat +
- *  teams overview), then one bubble per team, then a "+" to create one.
- *  Selecting a team opens its second-column panel (see `<TeamPanel>`). */
+/** Discord-style far-left rail of team "bubbles": one per team, then a "+" to
+ *  create one. Selecting a team opens its second-column panel (see
+ *  `<TeamPanel>`). There's no "home" bubble — Teams IS home, so it would only
+ *  bounce you back into the team you're already in. */
 export function TeamRail({
   variant = "sidebar",
   onNavigate,
@@ -37,8 +32,6 @@ export function TeamRail({
 
   const { data: teams } = useQuery(rpc.team.list.queryOptions());
   const { teamId: activeTeamId } = useParams({ strict: false });
-  const pathname = useLocation({ select: (l) => l.pathname });
-  const homeActive = pathname === "/home";
 
   return (
     <aside
@@ -48,22 +41,6 @@ export function TeamRail({
         variant === "sidebar" && "max-md:hidden",
       )}
     >
-      <RailBubble active={homeActive}>
-        <Link
-          to="/home"
-          aria-label="Home"
-          onClick={onNavigate}
-          className={cn(
-            "flex size-11 items-center justify-center rounded-xl bg-sidebar-accent text-sidebar-accent-foreground transition-all hover:rounded-lg",
-            homeActive && "bg-primary/20 text-primary",
-          )}
-        >
-          <HomeIcon className="size-5" />
-        </Link>
-      </RailBubble>
-
-      <div className="my-1 h-px w-8 bg-sidebar-border" />
-
       {teams?.map((team) => {
         const active = team.id === activeTeamId;
         return (

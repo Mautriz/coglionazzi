@@ -1,6 +1,12 @@
 # Production stack for dokploy (Traefik) — same shape as ../propanalyst's
-# deploy/compose.yml, trimmed to what coglionazzi needs: the app + its own
+# deploy/compose.yml, trimmed to what Insacco needs: the app + its own
 # Postgres + a volume for uploaded assets.
+#
+# The Postgres role, database, container host and both volumes are still named
+# `coglionazzi` — the app was renamed, the stored state was not. Renaming them
+# in place would point the app at a role/database that doesn't exist (initdb
+# only runs on an empty data dir) and orphan the live data behind a fresh
+# empty volume. They're invisible to users; leave them.
 #
 # dokploy provides the external `dokploy-network` and a Traefik instance that
 # terminates TLS (letsencrypt) and routes to the app by Host rule — so the
@@ -41,17 +47,17 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=dokploy-network
-      - traefik.http.services.coglionazzi-app-svc.loadbalancer.server.port=3000
+      - traefik.http.services.insacco-app-svc.loadbalancer.server.port=3000
 
-      - traefik.http.routers.coglionazzi-app-web.rule=Host(`${APP_HOST}`)
-      - traefik.http.routers.coglionazzi-app-web.entrypoints=web
-      - traefik.http.routers.coglionazzi-app-web.service=coglionazzi-app-svc
-      - traefik.http.routers.coglionazzi-app-web.middlewares=redirect-to-https@file
+      - traefik.http.routers.insacco-app-web.rule=Host(`${APP_HOST}`)
+      - traefik.http.routers.insacco-app-web.entrypoints=web
+      - traefik.http.routers.insacco-app-web.service=insacco-app-svc
+      - traefik.http.routers.insacco-app-web.middlewares=redirect-to-https@file
 
-      - traefik.http.routers.coglionazzi-app-websecure.rule=Host(`${APP_HOST}`)
-      - traefik.http.routers.coglionazzi-app-websecure.entrypoints=websecure
-      - traefik.http.routers.coglionazzi-app-websecure.service=coglionazzi-app-svc
-      - traefik.http.routers.coglionazzi-app-websecure.tls.certresolver=letsencrypt
+      - traefik.http.routers.insacco-app-websecure.rule=Host(`${APP_HOST}`)
+      - traefik.http.routers.insacco-app-websecure.entrypoints=websecure
+      - traefik.http.routers.insacco-app-websecure.service=insacco-app-svc
+      - traefik.http.routers.insacco-app-websecure.tls.certresolver=letsencrypt
     deploy:
       mode: replicated
       # Single replica: the uploads volume is node-local, so multiple
@@ -118,4 +124,4 @@ networks:
   # Local bridge for app↔postgres only.
   internal:
     driver: bridge
-    name: coglionazzi-internal
+    name: insacco-internal

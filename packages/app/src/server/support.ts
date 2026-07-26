@@ -115,7 +115,7 @@ export async function bumpTicketActivity(ticketId: string) {
 }
 
 /** Open a ticket (customer side) + its room + first message. `requesterUserId`
- *  records a logged-in coglionazzi requester for identity ONLY — the message
+ *  records a logged-in Insacco requester for identity ONLY — the message
  *  itself is still stored customer-side (created_by NULL) so the room's
  *  sender convention holds. */
 export async function createTicket(input: {

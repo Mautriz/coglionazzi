@@ -26,7 +26,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { rpc, type Outputs } from "~/lib/rpcClient";
 
-export const Route = createFileRoute("/home/games/decks/$deckId/")({
+export const Route = createFileRoute("/play/games/decks/$deckId/")({
   component: RouteComponent,
   loader: async ({ context, params }) => {
     try {
@@ -34,7 +34,7 @@ export const Route = createFileRoute("/home/games/decks/$deckId/")({
         rpc.game.decks.get.queryOptions({ input: { deckId: params.deckId } }),
       );
     } catch {
-      throw redirect({ to: "/home/games" });
+      throw redirect({ to: "/play/games" });
     }
   },
 });
@@ -67,7 +67,7 @@ function RouteComponent() {
       onSuccess: ({ id }) => {
         toast.success("Deck cloned");
         queryClient.invalidateQueries({ queryKey: rpc.game.decks.list.key() });
-        navigate({ to: "/home/games/decks/$deckId", params: { deckId: id } });
+        navigate({ to: "/play/games/decks/$deckId", params: { deckId: id } });
       },
     }),
   );
@@ -76,7 +76,7 @@ function RouteComponent() {
       onSuccess: () => {
         toast.success("Deck deleted");
         queryClient.invalidateQueries({ queryKey: rpc.game.decks.list.key() });
-        navigate({ to: "/home/games" });
+        navigate({ to: "/play/games" });
       },
     }),
   );
@@ -91,14 +91,14 @@ function RouteComponent() {
           variant="ghost"
           size="sm"
           className="-ml-2 text-muted-foreground"
-          onClick={() => navigate({ to: "/home/games" })}
+          onClick={() => navigate({ to: "/play/games" })}
         >
           <ArrowLeftIcon />
           Games
         </Button>
         <div className="flex items-center gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link to="/home/games/decks/$deckId/stats" params={{ deckId }}>
+            <Link to="/play/games/decks/$deckId/stats" params={{ deckId }}>
               <BarChart3Icon />
               Stats
             </Link>

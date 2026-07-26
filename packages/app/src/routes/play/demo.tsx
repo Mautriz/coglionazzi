@@ -6,7 +6,7 @@ import { Card, CardContent, CardTitle } from "~/components/ui/card";
 
 /** Playground for the app's building blocks — not a real feature, just the
  *  reference usage of <RichTextEditor /> and the upload stack. */
-export const Route = createFileRoute("/home/demo")({
+export const Route = createFileRoute("/play/demo")({
   component: RouteComponent,
 });
 

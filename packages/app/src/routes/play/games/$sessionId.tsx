@@ -28,7 +28,7 @@ import { cn } from "~/lib/classUtils";
 import { rpc, type Outputs } from "~/lib/rpcClient";
 import { useGameSession } from "~/lib/useGameSession";
 
-export const Route = createFileRoute("/home/games/$sessionId")({
+export const Route = createFileRoute("/play/games/$sessionId")({
   component: RouteComponent,
   loader: async ({ context, params }) => {
     try {
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/home/games/$sessionId")({
         }),
       );
     } catch {
-      throw redirect({ to: "/home/games" });
+      throw redirect({ to: "/play/games" });
     }
   },
 });
@@ -545,7 +545,7 @@ function Finished({ session }: { session: Session }) {
         <Button
           type="button"
           variant="outline"
-          onClick={() => navigate({ to: "/home/games" })}
+          onClick={() => navigate({ to: "/play/games" })}
         >
           Back to games
         </Button>

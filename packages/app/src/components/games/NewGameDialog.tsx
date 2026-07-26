@@ -43,7 +43,7 @@ export function NewGameDialog({
         // Freshen the lobby list for when the creator returns to the index
         // (they aren't subscribed to the live signal while on the play view).
         queryClient.invalidateQueries({ queryKey: rpc.game.sessions.list.key() });
-        navigate({ to: "/home/games/$sessionId", params: { sessionId: id } });
+        navigate({ to: "/play/games/$sessionId", params: { sessionId: id } });
       },
       onError: (e) => toast.error(e.message),
     }),

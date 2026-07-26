@@ -4,7 +4,7 @@ import { ArrowLeftIcon, Trophy } from "lucide-react";
 import { DeckStats } from "~/components/games/DeckStats";
 import { rpc } from "~/lib/rpcClient";
 
-export const Route = createFileRoute("/home/games/decks/$deckId/stats")({
+export const Route = createFileRoute("/play/games/decks/$deckId/stats")({
   component: RouteComponent,
   loader: async ({ context, params }) => {
     try {
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/home/games/decks/$deckId/stats")({
         rpc.game.decks.stats.queryOptions({ input: { deckId: params.deckId } }),
       );
     } catch {
-      throw redirect({ to: "/home/games" });
+      throw redirect({ to: "/play/games" });
     }
   },
 });
@@ -26,7 +26,7 @@ function RouteComponent() {
   return (
     <main className="flex w-full flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
       <Link
-        to="/home/games/decks/$deckId"
+        to="/play/games/decks/$deckId"
         params={{ deckId }}
         className="-ml-1 inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >

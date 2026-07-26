@@ -1,5 +1,5 @@
 {
-  "name": "coglionazzi-monorepo",
+  "name": "insacco-monorepo",
   "private": true,
   "workspaces": [
     "packages/*"

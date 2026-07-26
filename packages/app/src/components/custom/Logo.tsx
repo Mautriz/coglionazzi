@@ -29,7 +29,7 @@ export function Logo({
           textClassName,
         )}
       >
-        Coglionazzi
+        Insacco
       </span>
     </span>
   );
@@ -44,7 +44,7 @@ export function NerdIcon({ size = 46 }: { size?: number }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="coglionazzi"
+      aria-label="insacco"
     >
       <defs>
         <linearGradient
