@@ -1,7 +1,10 @@
 import { unlink } from "node:fs/promises";
+import { call } from "@orpc/server";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { fileService } from "../src/server/files";
+import { appRouter } from "../src/server/orpc/router";
+import { signUpTestUser } from "./helpers";
 
 describe("file uploads — image optimization", () => {
   it("downscales a huge image to <=1920px and recompresses to WebP", async () => {
@@ -52,6 +55,78 @@ describe("file uploads — image optimization", () => {
       expect(metadata.size).toBe(svg.length);
     } finally {
       await unlink(fileService.getFilePath(fileId));
+    }
+  });
+});
+
+describe("file uploads — arbitrary types", () => {
+  /** Store `file`, run `check` on the result, always clean up the blob. */
+  async function withStored(
+    file: File,
+    check: (stored: Awaited<ReturnType<typeof fileService.addFile>>) => void,
+  ) {
+    const stored = await fileService.addFile(file);
+    try {
+      check(stored);
+    } finally {
+      await unlink(fileService.getFilePath(stored.fileId));
+    }
+  }
+
+  it("stores types we have no special handling for, untouched", async () => {
+    const csv = Buffer.from("a,b\n1,2\n");
+    await withStored(
+      new File([csv], "report.CSV", { type: "text/csv" }),
+      ({ fileId, metadata }) => {
+        expect(metadata).toEqual({
+          name: "report.CSV",
+          type: "text/csv",
+          size: csv.length,
+        });
+        expect(fileId).toMatch(/\.csv$/);
+      },
+    );
+  });
+
+  it("derives the type from the name when the browser sends none", async () => {
+    await withStored(
+      new File([Buffer.from("<p>hi</p>")], "page.html", { type: "" }),
+      ({ fileId, metadata }) => {
+        expect(metadata.type).toBe("text/html");
+        expect(fileId).toMatch(/\.html$/);
+      },
+    );
+  });
+
+  it("falls back to octet-stream + .bin for an unknown, extension-less file", async () => {
+    await withStored(
+      new File([Buffer.from([0, 1, 2])], "mystery", { type: "" }),
+      ({ fileId, metadata }) => {
+        expect(metadata.type).toBe("application/octet-stream");
+        expect(fileId).toMatch(/\.bin$/);
+      },
+    );
+  });
+
+  it("accepts any type through rpc.file.upload (no allowlist)", async () => {
+    const { context } = await signUpTestUser("Uploader");
+
+    for (const [name, type] of [
+      ["data.csv", "text/csv"],
+      ["page.html", "text/html"],
+      ["thing.blend", ""],
+    ]) {
+      const uploaded = await call(
+        appRouter.file.upload,
+        { file: new File([Buffer.from("x")], name, { type }) },
+        { context },
+      );
+      try {
+        expect(uploaded.name).toBe(name);
+        expect(uploaded.url).toContain(uploaded.path);
+      } finally {
+        await unlink(fileService.getFilePath(uploaded.path));
+      }
     }
   });
 });

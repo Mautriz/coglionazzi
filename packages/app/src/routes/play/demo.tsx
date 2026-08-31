@@ -45,8 +45,8 @@ function RouteComponent() {
         <CardContent>
           <CardTitle className="mb-1">File uploads</CardTitle>
           <p className="mb-4 text-sm text-muted-foreground">
-            Images, PDFs, zips, audio, video… up to 20MB. Click an item to
-            copy its URL.
+            Any file type — images, PDFs, CSVs, zips, audio, video… up to
+            20MB. Click an item to copy its URL.
           </p>
           <FileUploads />
         </CardContent>

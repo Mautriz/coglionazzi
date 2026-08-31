@@ -6,9 +6,6 @@ import { Button } from "~/components/ui/button";
 import { rpc } from "~/lib/rpcClient";
 import { cn } from "~/lib/classUtils";
 
-export const UPLOAD_ACCEPT =
-  "image/png,image/jpeg,image/gif,image/webp,image/svg+xml,application/pdf,text/plain,text/markdown,application/zip,audio/mpeg,video/mp4";
-
 export function formatBytes(size: number) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(0)} KB`;
@@ -54,10 +51,13 @@ export function FilePreview({
 }
 
 /** Generic "pick a file and upload it" button around rpc.file.upload.
- *  Reused by the demo page and card attachments. */
+ *  Reused by the demo page and card attachments. Any file type is accepted
+ *  (the 20MB cap is the only limit) — pass `accept` only where the feature
+ *  genuinely needs one kind of file (e.g. deck images). */
 export function UploadButton({
   onUploaded,
   size = "default",
+  accept,
 }: {
   onUploaded?: (file: {
     id: string;
@@ -66,6 +66,7 @@ export function UploadButton({
     type: string;
   }) => void;
   size?: "default" | "sm";
+  accept?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -91,7 +92,7 @@ export function UploadButton({
       <input
         ref={inputRef}
         type="file"
-        accept={UPLOAD_ACCEPT}
+        accept={accept}
         className="hidden"
         onChange={onPick}
       />
@@ -141,7 +142,7 @@ export function FileUploads() {
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Nothing here yet — upload your finest memes and PDFs.
+          Nothing here yet — upload your finest memes, spreadsheets and PDFs.
         </p>
       )}
     </div>

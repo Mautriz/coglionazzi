@@ -145,6 +145,7 @@ function RouteComponent() {
         {editable && (
           <UploadButton
             size="sm"
+            accept="image/*"
             onUploaded={(file) =>
               addCard({ deckId, fileId: file.id, title: file.name })
             }

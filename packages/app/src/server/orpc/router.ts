@@ -22,24 +22,10 @@ export const appRouter = {
     upload: authP
       .input(
         z.object({
+          // Any file type is accepted — size is the only limit. Uploads are
+          // never served back in a way that can execute (see fileServeHeaders).
           file: z
             .file()
-            .mime(
-              [
-                "image/gif",
-                "image/jpeg",
-                "image/png",
-                "image/webp",
-                "image/svg+xml",
-                "application/pdf",
-                "text/plain",
-                "text/markdown",
-                "application/zip",
-                "audio/mpeg",
-                "video/mp4",
-              ],
-              "Unsupported file type",
-            )
             .max(20 * 1024 * 1024, "File size must be less than 20MB"),
         }),
       )

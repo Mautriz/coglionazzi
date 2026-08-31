@@ -282,15 +282,30 @@ Postgres + a `uploads` volume for assets.
 
 ### File uploads
 
-- Upload via `rpc.file.upload` (`{ file: File }`, auth required, ≤20MB,
-  allowlisted mime types: images, pdf, text/markdown, zip, mp3, mp4) →
-  returns `{ id, path, name, type, url }`. List the caller's files with
-  `rpc.file.mine`. UI helpers in `~/components/custom/FileUploads`:
-  `<UploadButton onUploaded>`, `<FilePreview>` (image thumb / file chip)
-  and the `<FileUploads />` gallery.
+- Upload via `rpc.file.upload` (`{ file: File }`, auth required, ≤20MB) →
+  returns `{ id, path, name, type, url }`. **ANY file type is accepted** —
+  size is the only limit (there is no mime allowlist; safety lives on the
+  SERVE side, below). List the caller's files with `rpc.file.mine`. UI helpers
+  in `~/components/custom/FileUploads`: `<UploadButton onUploaded accept?>`
+  (no `accept` = any file; pass one only where the feature needs one kind,
+  e.g. `image/*` for game-deck cards), `<FilePreview>` (image thumb / file
+  chip) and the `<FileUploads />` gallery.
 - Files live on disk at `IMAGES_PATH` (default `packages/app/data/images`,
   gitignored) and are served by `GET /api/files?fileId=…` with long cache.
-  The `files` table records path + metadata (`{name,type,size}`) + uploader.
+  The `files` table records path + metadata (`{name,type,size}`) + uploader
+  (unique index on `path` — the serve route looks the row up per request).
+- **Serving is the security boundary** (uploads are arbitrary and come back
+  from OUR origin, so an inline .html/.svg would be stored XSS on the session
+  cookie). `fileServeHeaders` (`server/files.ts`, unit-tested) decides from
+  the RECORDED metadata — never from the id's extension: raster
+  images/audio/video/pdf go `inline` with their real type; `image/svg+xml`
+  stays inline (it must render in `<img>`) but gets `Content-Security-Policy:
+  sandbox`; **everything else downloads** as `application/octet-stream` +
+  `Content-Disposition: attachment` + sandbox. Always `nosniff`, and the
+  original filename is carried (RFC 5987) so downloads aren't named `<uuid>`.
+  The declared mime type is untrusted input (`normalizeFileType`) and so is
+  the filename (`storageExtension` sanitizes the on-disk id's extension).
+  Unknown file id → 404.
 - Raster images are optimized on upload in `fileService.addFile` (`server/files.ts`,
   via `sharp`): auto-orient, downscale to ≤1920px longest edge, strip metadata,
   recompress to WebP q80 — so we never store/serve 8K originals. SVG and GIF are
