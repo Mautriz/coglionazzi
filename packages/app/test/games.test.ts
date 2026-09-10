@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { call, ORPCError } from "@orpc/server";
 import { afterEach, describe, expect, it } from "vitest";
 import { db } from "../src/server/db";
@@ -25,7 +26,9 @@ async function makeFile(userId: string): Promise<string> {
   const { id } = await db
     .insertInto("files")
     .values({
-      path: "x.webp",
+      // `files.path` is uniquely indexed — a deck has many cards, so each
+      // helper-made file needs its own storage id.
+      path: `${randomUUID()}.webp`,
       user_id: userId,
       metadata: JSON.stringify({ name: "x", type: "image/webp", size: 1 }),
     })
