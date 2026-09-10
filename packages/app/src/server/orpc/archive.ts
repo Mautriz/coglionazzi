@@ -1,6 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 import { db } from "../db";
+import { deleteFilesIfUnreferenced } from "../fileAccess";
 import { authP } from "./base";
 import {
   attachCardExtras,
@@ -133,9 +134,17 @@ export const archiveRouter = {
         });
       }
       await deleteCardRooms([info.input.cardId]);
+      // Collect the attachments BEFORE the delete — `card_attachments` is
+      // ON DELETE CASCADE, so the join rows vanish with the card.
+      const attached = await db
+        .selectFrom("card_attachments")
+        .where("card_id", "=", info.input.cardId)
+        .select("file_id")
+        .execute();
       await db
         .deleteFrom("cards")
         .where("id", "=", info.input.cardId)
         .execute();
+      await deleteFilesIfUnreferenced(attached.map((a) => a.file_id));
     }),
 };

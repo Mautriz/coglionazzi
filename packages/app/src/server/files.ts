@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, stat, unlink, writeFile } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 
@@ -203,6 +203,18 @@ class FileService {
     await writeFile(this.getFilePath(fileId), bytes);
 
     return { fileId, metadata: { name, type, size: bytes.length } };
+  }
+
+  /** Remove the bytes for a storage id. Idempotent — a missing file is
+   *  already the desired state (see `deleteFileIfUnreferenced`, which unlinks
+   *  after committing the row delete). */
+  async deleteFile(fileId: string): Promise<void> {
+    try {
+      await unlink(this.getFilePath(fileId));
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT") throw error;
+    }
   }
 }
 

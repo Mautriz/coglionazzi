@@ -1,5 +1,6 @@
 import { call } from "@orpc/server";
 import { auth } from "../src/server/auth";
+import { db } from "../src/server/db";
 import type { ORPCContext } from "../src/server/orpc/base";
 import { chatRouter } from "../src/server/orpc/chat";
 import { teamRouter } from "../src/server/orpc/teams";
@@ -21,6 +22,7 @@ export async function createTestTeam(
 export async function signUpTestUser(name = "Tester"): Promise<{
   context: ORPCContext;
   email: string;
+  userId: string;
 }> {
   const email = `${name.toLowerCase()}-${userCounter++}@test.local`;
   const { headers } = await auth.api.signUpEmail({
@@ -33,12 +35,19 @@ export async function signUpTestUser(name = "Tester"): Promise<{
     .map((c) => c.split(";")[0])
     .join("; ");
 
+  const { id } = await db
+    .selectFrom("users")
+    .where("email", "=", email)
+    .select("id")
+    .executeTakeFirstOrThrow();
+
   return {
     context: {
       reqHeaders: new Headers({ cookie }),
       resHeaders: new Headers(),
     },
     email,
+    userId: id,
   };
 }
 

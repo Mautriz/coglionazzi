@@ -1,6 +1,10 @@
 import { sql } from "kysely";
 import { z } from "zod";
 import { db } from "../../db";
+import {
+  deleteFileIfUnreferenced,
+  deleteFilesIfUnreferenced,
+} from "../../fileAccess";
 import { fileUrl } from "../../files";
 import { authP } from "../base";
 import { assertDeckOwner, deckIdOfCard } from "./access";
@@ -253,10 +257,16 @@ export const deckRouter = {
     .handler(async (info) => {
       const deckId = await deckIdOfCard(info.input.cardId);
       await assertDeckOwner(info.context.user.id, deckId);
+      const card = await db
+        .selectFrom("game_deck_cards")
+        .where("id", "=", info.input.cardId)
+        .select("file_id")
+        .executeTakeFirst();
       await db
         .deleteFrom("game_deck_cards")
         .where("id", "=", info.input.cardId)
         .execute();
+      if (card) await deleteFileIfUnreferenced(card.file_id);
     }),
 
   /** Clone any deck into a new one owned by the caller (so non-owners can copy
@@ -414,9 +424,17 @@ export const deckRouter = {
     .input(z.object({ deckId: z.uuid() }))
     .handler(async (info) => {
       await assertDeckOwner(info.context.user.id, info.input.deckId);
+      // Collect first — `game_deck_cards` cascades off the deck. A cloned
+      // deck references the SAME files, so shared images survive.
+      const cards = await db
+        .selectFrom("game_deck_cards")
+        .where("deck_id", "=", info.input.deckId)
+        .select("file_id")
+        .execute();
       await db
         .deleteFrom("game_decks")
         .where("id", "=", info.input.deckId)
         .execute();
+      await deleteFilesIfUnreferenced(cards.map((c) => c.file_id));
     }),
 };

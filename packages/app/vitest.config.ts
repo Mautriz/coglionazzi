@@ -12,5 +12,7 @@ export default defineConfig({
     // for the same backend session and corrupt each other's transactions.
     fileParallelism: false,
     testTimeout: 15_000,
+    // Keep test uploads out of the dev image store (both are gitignored).
+    env: { IMAGES_PATH: "./data/test-images" },
   },
 });

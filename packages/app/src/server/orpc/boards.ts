@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { sql } from "kysely";
 import { z } from "zod";
 import { db } from "../db";
+import { deleteFileIfUnreferenced } from "../fileAccess";
 import { fileUrl, type FileMetadata } from "../files";
 import { extractLexicalText } from "../lexicalText";
 import {
@@ -720,6 +721,9 @@ export const boardRouter = {
         .where("card_id", "=", info.input.cardId)
         .where("file_id", "=", info.input.fileId)
         .execute();
+      // Detaching the last reference destroys the file — otherwise a
+      // "removed" attachment stays readable at its URL forever.
+      await deleteFileIfUnreferenced(info.input.fileId);
       await publishBoardOfCard(info.input.cardId);
     }),
 };
