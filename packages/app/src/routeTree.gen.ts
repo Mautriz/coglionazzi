@@ -19,6 +19,7 @@ import { Route as HomeIndexRouteImport } from './routes/home/index'
 import { Route as PlayDemoRouteImport } from './routes/play/demo'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
+import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as HomeTeamsRouteRouteImport } from './routes/home/teams/route'
 import { Route as PlayGamesIndexRouteImport } from './routes/play/games/index'
@@ -88,6 +89,11 @@ const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => AuthRouteRoute,
+} as any)
+const ApiMcpRoute = ApiMcpRouteImport.update({
+  id: '/api/mcp',
+  path: '/api/mcp',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFilesRoute = ApiFilesRouteImport.update({
   id: '/api/files',
@@ -196,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/widget': typeof WidgetRoute
   '/home/teams': typeof HomeTeamsRouteRouteWithChildren
   '/api/files': typeof ApiFilesRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/play/demo': typeof PlayDemoRoute
@@ -224,6 +231,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRouteRouteWithChildren
   '/widget': typeof WidgetRoute
   '/api/files': typeof ApiFilesRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/play/demo': typeof PlayDemoRoute
@@ -255,6 +263,7 @@ export interface FileRoutesById {
   '/widget': typeof WidgetRoute
   '/home/teams': typeof HomeTeamsRouteRouteWithChildren
   '/api/files': typeof ApiFilesRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/play/demo': typeof PlayDemoRoute
@@ -288,6 +297,7 @@ export interface FileRouteTypes {
     | '/widget'
     | '/home/teams'
     | '/api/files'
+    | '/api/mcp'
     | '/auth/login'
     | '/auth/sign-up'
     | '/play/demo'
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/widget'
     | '/api/files'
+    | '/api/mcp'
     | '/auth/login'
     | '/auth/sign-up'
     | '/play/demo'
@@ -346,6 +357,7 @@ export interface FileRouteTypes {
     | '/widget'
     | '/home/teams'
     | '/api/files'
+    | '/api/mcp'
     | '/auth/login'
     | '/auth/sign-up'
     | '/play/demo'
@@ -377,6 +389,7 @@ export interface RootRouteChildren {
   PlayRouteRoute: typeof PlayRouteRouteWithChildren
   WidgetRoute: typeof WidgetRoute
   ApiFilesRoute: typeof ApiFilesRoute
+  ApiMcpRoute: typeof ApiMcpRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiRpcSplatRoute: typeof ApiRpcSplatRoute
   ApiSupportConfigRoute: typeof ApiSupportConfigRoute
@@ -456,6 +469,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/login'
       preLoaderRoute: typeof AuthLoginRouteImport
       parentRoute: typeof AuthRouteRoute
+    }
+    '/api/mcp': {
+      id: '/api/mcp'
+      path: '/api/mcp'
+      fullPath: '/api/mcp'
+      preLoaderRoute: typeof ApiMcpRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/files': {
       id: '/api/files'
@@ -683,6 +703,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlayRouteRoute: PlayRouteRouteWithChildren,
   WidgetRoute: WidgetRoute,
   ApiFilesRoute: ApiFilesRoute,
+  ApiMcpRoute: ApiMcpRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiRpcSplatRoute: ApiRpcSplatRoute,
   ApiSupportConfigRoute: ApiSupportConfigRoute,

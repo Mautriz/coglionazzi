@@ -330,6 +330,44 @@ export const boardRouter = {
       };
     }),
 
+  /** ONE card, fully nested — the same shape `board.get` yields per card, plus
+   *  the board/column names for context. The UI always has the whole board
+   *  loaded, so this exists for callers that don't: the MCP `get_task` tool
+   *  would otherwise have to fetch an entire board to read a single task.
+   *
+   *  Resolves archived cards too (their `column_id` may be null, hence the
+   *  left joins) — `archived_origin` then names where they came from. */
+  getCard: authP
+    .input(z.object({ cardId: z.uuid() }))
+    .handler(async (info) => {
+      await assertCardAccess(info.context.user.id, info.input.cardId);
+
+      const card = await db
+        .selectFrom("cards")
+        .leftJoin("board_columns", "board_columns.id", "cards.column_id")
+        .leftJoin("boards", "boards.id", "board_columns.board_id")
+        .where("cards.id", "=", info.input.cardId)
+        .selectAll("cards")
+        .select([
+          "board_columns.name as columnName",
+          "board_columns.board_id as boardId",
+          "boards.name as boardName",
+        ])
+        .executeTakeFirst();
+
+      if (!card) {
+        throw new ORPCError("NOT_FOUND", { message: "Card not found" });
+      }
+
+      // Archived counterparts stay visible here: a bot reading one task wants
+      // the whole relation picture, not the board view's live-only subset.
+      const [withExtras] = await attachCardExtras([card], {
+        liveRelationsOnly: false,
+      });
+
+      return withExtras;
+    }),
+
   addColumn: authP
     .input(
       z.object({

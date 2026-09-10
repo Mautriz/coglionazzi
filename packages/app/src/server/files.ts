@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 
@@ -203,6 +203,12 @@ class FileService {
     await writeFile(this.getFilePath(fileId), bytes);
 
     return { fileId, metadata: { name, type, size: bytes.length } };
+  }
+
+  /** The whole file as bytes. Used by the MCP `get_attachment` tool, which
+   *  inlines small files into a tool result rather than linking to them. */
+  async readFile(fileId: string): Promise<Buffer> {
+    return readFile(this.getFilePath(fileId));
   }
 
   /** Remove the bytes for a storage id. Idempotent — a missing file is

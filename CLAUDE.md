@@ -79,7 +79,8 @@ packages/
         │   ├── widget.tsx        # public (no-auth) support widget — iframe content
         │   └── api/
         │       ├── auth/$.ts      # better-auth handler (GET/POST)
-        │       ├── files.ts       # GET ?fileId= → streams an uploaded file
+        │       ├── files.ts       # GET ?fileId= → streams an uploaded file (authed)
+        │       ├── mcp.ts         # POST → MCP server for Claude Code (API-key auth)
         │       ├── support/       # PUBLIC widget endpoints (config/tickets/messages/stream-SSE)
         │       └── rpc/$.ts       # oRPC RPCHandler (ANY), prefix /api/rpc
         ├── server/                # server-only code
@@ -89,6 +90,11 @@ packages/
         │   ├── ws/
         │   │   └── rpcHandler.ts  # crossws WS handler: upgrade auth + 5-min re-check
         │   ├── files.ts           # disk storage; optimizes images on upload (sharp)
+        │   ├── fileAccess.ts      # assertFileAccess + delete-when-unreferenced
+        │   ├── fileServe.ts       # GET /api/files logic (auth + authorize)
+        │   ├── apiKeys.ts         # mint/hash/resolve API keys (ins_… bearer)
+        │   ├── httpCaller.ts      # resolveHttpCaller for plain (non-oRPC) routes
+        │   ├── mcp/               # route.ts, server.ts, tools.ts, render.ts
         │   ├── http.ts            # CORS + JSON/error helpers for the public support API
         │   ├── support.ts         # shared support logic (tickets/messages) — router + widget
         │   ├── realtime/
@@ -106,6 +112,7 @@ packages/
         │       ├── presence.ts    # presence.subscribe Event Iterator
         │       ├── globalPresence.ts # globalPresence.subscribe (app-wide online roster)
         │       ├── game/          # decks + sessions (lobby) + versus module + access
+        │       ├── apiKeys.ts     # apiKey.* (list/create/revoke, own keys only)
         │       ├── router.ts      # appRouter — add feature routers here
         │       └── client.ts      # createAppClient → typed client + query utils
         ├── lib/
@@ -169,6 +176,9 @@ Postgres + a `uploads` volume for assets.
   Deploy with `docker compose up -d --build` from `deploy/`.
 - Local smoke-test without Traefik: add an override publishing the port
   (`ports: ["8090:3000"]`) and `docker network create dokploy-network`.
+- The MCP endpoint (see Conventions → External API) needs nothing extra: a plain
+  POST on the app's own port, authenticated by API key. `VITE_FRONTEND_URL` must
+  be the real public origin — the endpoint rejects a mismatched `Host`.
 - Realtime (see Conventions → Realtime) needs nothing extra: the WebSocket
   shares the app's port (`/api/rpc-ws`) and Traefik forwards upgrades by
   default. Keep it to ONE app replica — the event bus/presence live in
@@ -202,6 +212,8 @@ Postgres + a `uploads` volume for assets.
   they set the session cookie with Set-Cookie, which the WebSocket transport
   can't deliver, so they must NOT go through oRPC. The oRPC `auth` router is
   read-only (`getSession`).
+- **API keys are the third auth path** (external clients — see External API):
+  resolved in `resolveSession` alongside the cookie and the WS connection.
 - better-auth maps camelCase fields to snake_case columns in
   `src/server/auth.ts` — new auth-related tables must follow that pattern.
 - **Discord OAuth** (optional): `socialProviders.discord` is registered only
@@ -291,10 +303,32 @@ Postgres + a `uploads` volume for assets.
   e.g. `image/*` for game-deck cards), `<FilePreview>` (image thumb / file
   chip) and the `<FileUploads />` gallery.
 - Files live on disk at `IMAGES_PATH` (default `packages/app/data/images`,
-  gitignored) and are served by `GET /api/files?fileId=…` with long cache.
+  gitignored) and are served by `GET /api/files?fileId=…`.
   The `files` table records path + metadata (`{name,type,size}`) + uploader
   (unique index on `path` — the serve route looks the row up per request).
-- **Serving is the security boundary** (uploads are arbitrary and come back
+- **Reading a file requires a caller AND authorization.** The route is a thin
+  wrapper over `serveFile` (`server/fileServe.ts`, directly tested):
+  `resolveHttpCaller` (session cookie OR API key) → 401, then
+  `assertFileAccess(userId, path)` (`server/fileAccess.ts`) → 404. Access is
+  granted if you uploaded it, OR it's attached to a card in one of your teams,
+  OR it's a game-deck image (decks are deliberately GLOBAL). Denial and
+  non-existence BOTH answer 404 — the storage id is the only secret, so a 403
+  would confirm an id is real. Responses are `Cache-Control: private`.
+  The same `assertFileAccess` gates the MCP `get_attachment` tool — one rule,
+  both callers; keep it that way.
+- **Files are deleted when their LAST reference goes**
+  (`deleteFileIfUnreferenced`), wired into `board.removeAttachment`,
+  `archive.purge`, `game.decks.removeCard` and `decks.delete`. Both
+  `card_attachments.file_id` and `game_deck_cards.file_id` are ON DELETE
+  CASCADE to `files.id`, so **the DB can never block deleting a referenced
+  file** — it would silently strip it from every card/deck. The check therefore
+  rides INSIDE the delete as `NOT EXISTS` legs (one atomic statement, no
+  read-then-write window, no explicit transaction — which would nest badly
+  inside the tests' BEGIN). Callers must collect file ids BEFORE the delete that
+  cascades their join rows away; cloned decks share files, so a clone keeps the
+  original's images alive. Unattached uploads are NOT collected (they're the
+  uploader's, and show in `file.mine`).
+- **Serving is also the XSS boundary** (uploads are arbitrary and come back
   from OUR origin, so an inline .html/.svg would be stored XSS on the session
   cookie). `fileServeHeaders` (`server/files.ts`, unit-tested) decides from
   the RECORDED metadata — never from the id's extension: raster
@@ -646,6 +680,68 @@ Postgres + a `uploads` volume for assets.
 - **Out of scope (v1):** rich text/attachments in the widget, agent
   assignment, widget theming, email notifications, and spam rate-limiting on
   the public `POST tickets` (the widget key is public) — the first follow-up.
+
+### External API (API keys + MCP)
+
+- **Purpose:** let things outside the browser reach the app — above all
+  **Claude Code over MCP** (hand it a task; it reads the full context, does the
+  work, comments back). A hand-written bot could use the same keys over HTTP.
+- **API keys** (`api_keys`, migration `1770000000012_api-keys`): a key acts as
+  its creating USER across every team they belong to — no per-team binding, no
+  read/write split. Only the SHA-256 of the token is stored (`server/apiKeys.ts`):
+  deliberately NOT a password hash — the token is 256 random bits, and this runs
+  on every external request. `prefix` (first 12 chars) is kept in clear for the
+  UI; `last_used_at` is throttled to one write a minute per key. Manage with
+  `rpc.apiKey.{list,create,revoke}` (own keys only; `create` returns the token
+  ONCE) and the `<ApiKeysDialog>` (key icon in `UserActions`), which shows the
+  whole `claude mcp add` command ready to paste.
+- **The auth branch lives in ONE place.** `resolveSession` (`orpc/base.ts`) now
+  reconciles three transports: WS connection → `Authorization: Bearer ins_…`
+  → session cookie. Because every `authP` procedure reads `context.user`, key
+  callers get the whole API with **no per-procedure change**, and every
+  `assertTeamMember` gate applies unchanged. Plain (non-oRPC) routes use
+  `resolveHttpCaller` (`server/httpCaller.ts`), which has the same branch — add
+  new auth transports to those two functions, never per-route. An API-key
+  caller has no better-auth session row, so `session` is null and `viaApiKey`
+  is true. A bearer token that looks like ours but doesn't resolve FAILS rather
+  than falling through to the cookie.
+- **MCP endpoint:** `POST /api/mcp` (`routes/api/mcp.ts` → `server/mcp/route.ts`,
+  directly tested). **API key ONLY — a browser session cookie is deliberately
+  refused**, or the endpoint would be reachable cross-site from a logged-in
+  user's browser. Also rejects a `Host` that isn't `VITE_FRONTEND_URL`'s
+  (neither MCP SDK does DNS-rebinding defence). Uses the SDK's
+  `WebStandardStreamableHTTPServerTransport` — pure Web Fetch
+  (`handleRequest(Request): Promise<Response>`), no Node req/res adapter —
+  **stateless** (`sessionIdGenerator: undefined`): a fresh server per request.
+- **Tools** (`server/mcp/tools.ts`) are **hand-written and curated**, NOT
+  generated per procedure — there is no official oRPC↔MCP bridge, and a mirror
+  of the router would make a bot take five calls to understand one task. Each
+  tool dispatches with `call(appRouter.x.y, input, { context })`, so access
+  control is the normal one. Eleven today: `list_teams`, `list_boards`,
+  `list_team_members`, `get_board`, `search`, **`get_task`**, `get_attachment`,
+  `create_task`, `update_task`, `comment_task`, `archive_task`. Subscriptions,
+  presence, uploads, support and the game/deck procedures are NOT exposed.
+  Adding a tool = a `define({...})` entry + registration in `TOOLS`; write a
+  description aimed at a model deciding whether to call it.
+- **`get_task` is the centrepiece:** ONE call returns the whole dossier as
+  markdown (fields, description, every comment, assignees, tags, relations,
+  attachment list). Rendering is pure (`server/mcp/render.ts`, unit-tested) —
+  keep it that way. It's cheap because `cards.description_text` and
+  `chat_messages.body_text` (the search companion columns) already hold plain
+  text. It needs `board.getCard` (added for this: one fully-nested card, the
+  UI never needed it because it always has the whole board).
+- **`get_attachment`** returns an MCP **image content block** for images, so a
+  screenshot reaches the model's vision rather than arriving as a link; text
+  files come back as text, anything else is refused with a message. Capped at
+  5MB. Gated by the same `assertFileAccess` as the browser route.
+- Domain errors (`ORPCError`) are converted to MCP tool errors carrying the
+  message, so a model sees `FORBIDDEN: …` and can act on it instead of a crash.
+- **Not built (deliberate):** rate limiting, key expiry, per-key scopes,
+  API keys over WebSocket, MCP resources/prompts, and **OpenAPI** — the last is
+  a cheap follow-up rather than a rewrite: `@orpc/openapi` v1.15's
+  `OpenAPIHandler` takes a `filter`, so the same curated set becomes REST plus
+  a Scalar docs page in ~20 lines (import the zod v4 converter from
+  `@orpc/zod/zod4`; exclude subscriptions).
 
 ### Realtime (WebSockets)
 
