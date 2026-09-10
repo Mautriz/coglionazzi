@@ -1,7 +1,7 @@
 # External API: API keys + MCP server (and locking down file serving)
 
 **Date:** 2026-09-10
-**Status:** Approved
+**Status:** Implemented (2026-09-10)
 
 ## Problem
 
@@ -352,3 +352,37 @@ Alongside the code:
   application-level reference check mandatory.
 - Note in **Deploy** that `/api/mcp` needs no special handling (same port, plain
   POST).
+
+## As built — deviations from this spec
+
+Implemented in `58a4a19` (files), `615f07b` (API keys), `2d48438` (MCP).
+Where the build differs from the design above, the build is right:
+
+- **The MCP endpoint refuses session cookies.** Not in the original design.
+  Accepting them would make `/api/mcp` reachable cross-site from a logged-in
+  user's browser, so it takes API keys only, and additionally rejects a `Host`
+  that isn't `VITE_FRONTEND_URL`'s.
+- **`deleteFileIfUnreferenced` uses one atomic statement**, not a transaction
+  with `SELECT … FOR UPDATE`. The `NOT EXISTS` legs ride inside the `DELETE`,
+  which removes the read-then-write window and avoids an explicit transaction —
+  which would nest badly inside the test harness's `BEGIN`/`ROLLBACK`.
+- **Eleven tools, not ten.** `list_team_members` was added: `update_task`'s
+  `assigneeIds` needs user ids, and nothing else surfaced them.
+- **Migration is `1770000000012_api-keys`** — `…011` was taken by
+  `file-path-index`. `api_keys.user_id` is `text`, because better-auth's
+  `users.id` is text rather than a uuid.
+- **`resolveSession` returns `session: AuthSession | null` plus `viaApiKey`**,
+  as designed; a bearer token that looks like ours but doesn't resolve now
+  fails outright rather than falling through to the cookie.
+- **Test uploads** go to `./data/test-images` (`vitest.config.ts` `env`) so they
+  never touch the dev image store.
+- Route logic lives in `server/fileServe.ts` and `server/mcp/route.ts` so both
+  are directly testable; the route files are thin wrappers.
+
+**Verification:** 235 tests pass, type-check and production build are clean, and
+the whole flow was exercised against a running server — sign-up, key creation,
+`initialize`, `tools/list`, and `create_task` → `comment_task` → attach →
+`get_task` → `update_task`, plus `/api/files` returning 401 anonymously and 200
+with either a cookie or a key. The two security-critical route tests (cookies
+refused; no cross-user leakage) were mutation-tested to confirm they fail when
+the protection is removed.
