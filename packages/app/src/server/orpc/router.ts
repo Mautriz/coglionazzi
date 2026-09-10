@@ -5,6 +5,7 @@ import {
   fileUrl,
   type FileMetadata,
 } from "../files";
+import { apiKeyRouter } from "./apiKeys";
 import { archiveRouter } from "./archive";
 import { authP, resolveSession, t } from "./base";
 import { boardRouter } from "./boards";
@@ -70,6 +71,7 @@ export const appRouter = {
       }));
     }),
   },
+  apiKey: apiKeyRouter,
   board: boardRouter,
   archive: archiveRouter,
   chat: chatRouter,

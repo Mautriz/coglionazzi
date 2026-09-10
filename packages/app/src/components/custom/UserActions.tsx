@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { LogOutIcon, MoonIcon, SunIcon } from "lucide-react";
+import { KeyRoundIcon, LogOutIcon, MoonIcon, SunIcon } from "lucide-react";
+import { useState } from "react";
+import { ApiKeysDialog } from "~/components/custom/ApiKeysDialog";
 import { UserAvatar } from "~/components/custom/UserAvatar";
 import { Button } from "~/components/ui/button";
 import { authClient } from "~/lib/authClient";
@@ -14,6 +16,7 @@ export function UserActions() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const theme = useTheme();
+  const [keysOpen, setKeysOpen] = useState(false);
   // The session is resolved once in __root and cached forever — read it here.
   const { data: session } = useQuery(
     rpc.auth.getSession.queryOptions({ staleTime: Infinity }),
@@ -42,6 +45,18 @@ export function UserActions() {
       <Button variant="ghost" size="icon" onClick={toggleTheme}>
         {theme === "dark" ? <SunIcon /> : <MoonIcon />}
       </Button>
+      {me && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setKeysOpen(true)}
+          aria-label="API keys"
+          title="API keys"
+        >
+          <KeyRoundIcon />
+        </Button>
+      )}
+      {keysOpen && <ApiKeysDialog onClose={() => setKeysOpen(false)} />}
       {me && (
         <UserAvatar
           id={me.id}

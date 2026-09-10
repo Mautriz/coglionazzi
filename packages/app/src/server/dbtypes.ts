@@ -39,6 +39,17 @@ export interface Accounts {
   user_id: string;
 }
 
+export interface ApiKeys {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  key_hash: string;
+  last_used_at: Timestamp | null;
+  name: string;
+  prefix: string;
+  revoked_at: Timestamp | null;
+  user_id: string;
+}
+
 export interface BoardColumns {
   board_id: string;
   id: Generated<string>;
@@ -251,6 +262,7 @@ export interface VersusVotes {
 
 export interface DB {
   accounts: Accounts;
+  api_keys: ApiKeys;
   board_columns: BoardColumns;
   boards: Boards;
   card_assignees: CardAssignees;
