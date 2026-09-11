@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { mcp } from "better-auth/plugins";
 import { pool } from "./db";
 
 const frontendUrl = process.env.VITE_FRONTEND_URL ?? "http://localhost:3300";
@@ -7,6 +8,10 @@ const frontendUrl = process.env.VITE_FRONTEND_URL ?? "http://localhost:3300";
 // present so the app still boots without them.
 const discordConfigured =
   !!process.env.DISCORD_CLIENT_ID && !!process.env.DISCORD_CLIENT_SECRET;
+
+// Where the OAuth authorize endpoint sends a logged-out user (see the mcp
+// plugin below); the page continues the flow after sign-in.
+const OAUTH_LOGIN_PAGE = "/auth/login";
 
 export const auth = betterAuth({
   // Needed for server-side `auth.api.*` calls that build absolute URLs
@@ -22,6 +27,68 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 8,
   },
+
+  plugins: [
+    // OAuth 2.1 authorization server for MCP clients that cannot send an API
+    // key — claude.ai custom connectors and Claude Code's `/mcp` login. A
+    // logged-out user is sent to OUR login page with the authorize query
+    // attached; the page continues the flow after sign-in (lib/oauthLogin.ts).
+    // Whoever signs in is the user the OAuth client acts as. No consent
+    // screen: for this friend group, logging in IS the consent.
+    mcp({
+      loginPage: OAUTH_LOGIN_PAGE,
+      // RFC 9728 resource identifier = the protected endpoint itself.
+      resource: `${frontendUrl}/api/mcp`,
+      oidcConfig: {
+        // `mcp()` overwrites this with the option above at runtime, but the
+        // underlying OIDCOptions type marks it required — pass the same const.
+        loginPage: OAUTH_LOGIN_PAGE,
+        // Long-lived on purpose: a connector that silently stops working after
+        // an hour is worse than a token that lives about as long as a session
+        // (API keys never expire at all).
+        accessTokenExpiresIn: 60 * 60 * 24 * 30,
+        refreshTokenExpiresIn: 60 * 60 * 24 * 90,
+        // snake_case columns, like every other better-auth table (see the
+        // `user`/`session`/`account` maps below and migration …013).
+        schema: {
+          oauthApplication: {
+            modelName: "oauth_applications",
+            fields: {
+              clientId: "client_id",
+              clientSecret: "client_secret",
+              redirectUrls: "redirect_urls",
+              userId: "user_id",
+              createdAt: "created_at",
+              updatedAt: "updated_at",
+            },
+          },
+          oauthAccessToken: {
+            modelName: "oauth_access_tokens",
+            fields: {
+              accessToken: "access_token",
+              refreshToken: "refresh_token",
+              accessTokenExpiresAt: "access_token_expires_at",
+              refreshTokenExpiresAt: "refresh_token_expires_at",
+              clientId: "client_id",
+              userId: "user_id",
+              createdAt: "created_at",
+              updatedAt: "updated_at",
+            },
+          },
+          oauthConsent: {
+            modelName: "oauth_consents",
+            fields: {
+              clientId: "client_id",
+              userId: "user_id",
+              consentGiven: "consent_given",
+              createdAt: "created_at",
+              updatedAt: "updated_at",
+            },
+          },
+        },
+      },
+    }),
+  ],
 
   socialProviders: discordConfigured
     ? {
