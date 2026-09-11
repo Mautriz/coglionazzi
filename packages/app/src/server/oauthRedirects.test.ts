@@ -19,6 +19,7 @@ describe("isAllowedOAuthRedirect", () => {
     "https://claude.ai.evil.example/callback",
     "https://notclaude.ai/callback",
     "https://localhost.evil.example/callback",
+    "http://127.0.0.1:9797/cb,https://evil.example/callback",
     "javascript:alert(1)",
     "not a url",
   ])("refuses %s", (uri) => {

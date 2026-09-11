@@ -117,6 +117,28 @@ describe("OAuth authorization server (better-auth mcp plugin)", () => {
     );
 
     expect(res.status).toBe(201);
+    expect((await res.json()).redirect_uris).toEqual([
+      "https://claude.ai/api/mcp/auth_callback",
+    ]);
+  });
+
+  it("refuses a redirect URI that smuggles a second URL after a comma", async () => {
+    const res = await auth.handler(
+      new Request(`${AUTH_ORIGIN}/api/auth/mcp/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          client_name: "Comma smuggler",
+          // better-auth stores the list comma-joined and splits it back at
+          // authorize time, so a comma inside ONE entry registers two URIs.
+          redirect_uris: [`${REDIRECT_URI},https://evil.example/callback`],
+          token_endpoint_auth_method: "none",
+        }),
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toMatch(/redirect/i);
   });
 });
 

@@ -11,6 +11,12 @@ const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
  *  https on an allowed host (or a subdomain of one), or http/https on
  *  loopback with any port. Anything unparsable is refused. */
 export function isAllowedOAuthRedirect(uri: string): boolean {
+  // better-auth stores the whole list as `redirect_uris.join(",")` and splits
+  // it back on "," at authorize time, so a comma INSIDE one entry silently
+  // registers two URIs — and only the first would be checked here. A comma is
+  // a legal path character, so this must be refused explicitly.
+  if (uri.includes(",")) return false;
+
   let url: URL;
   try {
     url = new URL(uri);

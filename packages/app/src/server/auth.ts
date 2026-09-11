@@ -41,6 +41,8 @@ export const auth = betterAuth({
       const refused = list.filter(
         (uri) => typeof uri !== "string" || !isAllowedOAuthRedirect(uri),
       );
+      // The empty-list leg is redundant defence: better-auth's own zod schema
+      // already requires a non-empty `redirect_uris`.
       if (list.length === 0 || refused.length > 0) {
         throw new APIError("BAD_REQUEST", {
           error: "invalid_redirect_uri",
