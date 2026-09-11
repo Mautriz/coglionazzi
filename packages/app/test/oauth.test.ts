@@ -65,6 +65,7 @@ describe("OAuth authorization server (better-auth mcp plugin)", () => {
     const token = await exchangeCode(clientId, code!, verifier);
     expect(token.access_token).toBeTruthy();
     expect(token.refresh_token).toBeTruthy();
+    expect(token.expires_in).toBe(60 * 60 * 24 * 30);
 
     const grant = await auth.api.getMcpSession({
       headers: new Headers({ authorization: `Bearer ${token.access_token}` }),
@@ -83,6 +84,39 @@ describe("OAuth authorization server (better-auth mcp plugin)", () => {
     await expect(
       exchangeCode(clientId, code, "not-the-verifier"),
     ).rejects.toThrow(/token failed/);
+  });
+
+  it("refuses to register a client whose redirect URI is not Anthropic's or loopback", async () => {
+    const res = await auth.handler(
+      new Request(`${AUTH_ORIGIN}/api/auth/mcp/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          client_name: "Phisher",
+          redirect_uris: [REDIRECT_URI, "https://evil.example/callback"],
+          token_endpoint_auth_method: "none",
+        }),
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toMatch(/redirect/i);
+  });
+
+  it("registers a client for claude.ai's callback", async () => {
+    const res = await auth.handler(
+      new Request(`${AUTH_ORIGIN}/api/auth/mcp/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          client_name: "Claude",
+          redirect_uris: ["https://claude.ai/api/mcp/auth_callback"],
+          token_endpoint_auth_method: "none",
+        }),
+      }),
+    );
+
+    expect(res.status).toBe(201);
   });
 });
 

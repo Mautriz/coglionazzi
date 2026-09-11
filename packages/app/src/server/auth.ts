@@ -1,6 +1,8 @@
 import { betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { mcp } from "better-auth/plugins";
 import { pool } from "./db";
+import { isAllowedOAuthRedirect } from "./oauthRedirects";
 
 const frontendUrl = process.env.VITE_FRONTEND_URL ?? "http://localhost:3300";
 
@@ -28,6 +30,27 @@ export const auth = betterAuth({
     minPasswordLength: 8,
   },
 
+  hooks: {
+    // Dynamic client registration is anonymous and the mcp plugin issues codes
+    // without a consent screen, so the redirect_uri allowlist is the ONLY
+    // thing keeping a rogue client from harvesting codes via a shared link.
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/mcp/register") return;
+      const uris: unknown = ctx.body?.redirect_uris;
+      const list = Array.isArray(uris) ? uris : [];
+      const refused = list.filter(
+        (uri) => typeof uri !== "string" || !isAllowedOAuthRedirect(uri),
+      );
+      if (list.length === 0 || refused.length > 0) {
+        throw new APIError("BAD_REQUEST", {
+          error: "invalid_redirect_uri",
+          error_description:
+            "redirect_uris must be https URLs on claude.ai / claude.com or loopback (localhost) URLs",
+        });
+      }
+    }),
+  },
+
   plugins: [
     // OAuth 2.1 authorization server for MCP clients that cannot send an API
     // key — claude.ai custom connectors and Claude Code's `/mcp` login. A
@@ -49,7 +72,12 @@ export const auth = betterAuth({
         accessTokenExpiresIn: 60 * 60 * 24 * 30,
         refreshTokenExpiresIn: 60 * 60 * 24 * 90,
         // snake_case columns, like every other better-auth table (see the
-        // `user`/`session`/`account` maps below and migration …013).
+        // `user`/`session`/`account` maps below and migration …013). The map
+        // reaches the adapter through oidcProvider's in-place mergeSchema on
+        // the plugin's shared schema object (the mcp plugin itself returns that
+        // same object). If a better-auth upgrade ever stops mutating, queries
+        // would target camelCase names — oauth.test.ts's token-exchange test is
+        // the regression guard.
         schema: {
           oauthApplication: {
             modelName: "oauth_applications",

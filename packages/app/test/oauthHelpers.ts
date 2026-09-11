@@ -3,8 +3,8 @@ import { auth } from "../src/server/auth";
 import { db } from "../src/server/db";
 import type { ORPCContext } from "../src/server/orpc/base";
 
-/** Same fallback as `auth.ts` uses for `baseURL` (VITE_FRONTEND_URL is unset
- *  under `npm test`). Requests to `auth.handler` must use this origin. */
+/** Mirrors the `baseURL` fallback in `auth.ts` so the two cannot diverge.
+ *  Requests to `auth.handler` must use this origin. */
 export const AUTH_ORIGIN =
   process.env.VITE_FRONTEND_URL ?? "http://localhost:3300";
 
