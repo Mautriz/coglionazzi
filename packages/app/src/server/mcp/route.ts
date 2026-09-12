@@ -173,6 +173,7 @@ export async function serveMcp(request: Request): Promise<Response> {
         resHeaders: new Headers(),
       },
       caller.userId,
+      body,
     ),
   );
 

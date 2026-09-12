@@ -802,6 +802,16 @@ Postgres + a `uploads` volume for assets.
   API key shows only its public `ins_` prefix, an OAuth token only its length,
   a cookie only present/none, and tool params are never printed. Set
   `MCP_LOG=verbose` to also dump every other non-secret header.
+- **Sessions are HYBRID** (`server/mcp/sessions.ts`): `initialize` mints one
+  and the SDK returns `Mcp-Session-Id`; a request carrying that id reuses the
+  same server+transport; a request WITHOUT one is still served standalone on a
+  throwaway stateless transport. Both halves matter — stateless returned no
+  session id at all and a client that requires one (the claude.ai connector)
+  retried the handshake forever, while requiring the id would break Claude
+  Code, curl and the tests. A session is BOUND to the user who created it;
+  another user's id answers 404, so it can't be probed or borrowed. Sessions
+  are in-memory (single-instance, like the event bus) and reaped after an hour
+  idle, opportunistically on each new session rather than on a timer.
 - **GET and DELETE go through the SDK too**, not a hand-written 405. GET opens
   the standalone SSE stream a Streamable HTTP client uses for server-initiated
   messages; a client that treats it as required otherwise gives up right after

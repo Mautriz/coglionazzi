@@ -22,6 +22,20 @@ function rpc(method: string, params: unknown = {}, id: number | null = 1) {
   return JSON.stringify({ jsonrpc: "2.0", id, method, params });
 }
 
+/** A well-formed `initialize` — the handshake is validated against the MCP
+ *  schema, so empty params are rejected as a bad request. */
+function initRpc(id = 1) {
+  return rpc(
+    "initialize",
+    {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "test", version: "1.0.0" },
+    },
+    id,
+  );
+}
+
 function post(body: string, token?: string): Request {
   return new Request("http://localhost/api/mcp", {
     method: "POST",
@@ -109,7 +123,7 @@ describe("MCP endpoint authentication", () => {
     const { context } = await signUpTestUser("owner");
     const token = await keyFor(context);
 
-    const response = await serveMcp(post(rpc("initialize"), token));
+    const response = await serveMcp(post(initRpc(), token));
 
     expect(response.status).toBe(200);
   });
@@ -294,7 +308,7 @@ describe("MCP endpoint CORS", () => {
     const { context } = await signUpTestUser("cors");
     const token = await keyFor(context);
 
-    const response = await serveMcp(post(rpc("initialize"), token));
+    const response = await serveMcp(post(initRpc(), token));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("access-control-allow-origin")).toBe("*");
@@ -388,5 +402,117 @@ describe("MCP standalone SSE stream (GET)", () => {
 
     expect(response.headers.get("access-control-allow-origin")).toBe("*");
     await response.body?.cancel();
+  });
+});
+
+describe("MCP sessions", () => {
+  // Stateless mode returns no Mcp-Session-Id, and a client that treats the
+  // session as required then retries initialize forever without ever calling
+  // a tool — exactly what the claude.ai connector did.
+  async function initialize(token: string) {
+    return serveMcp(
+      post(
+        rpc("initialize", {
+          protocolVersion: "2025-11-25",
+          capabilities: {},
+          clientInfo: { name: "test", version: "1.0.0" },
+        }),
+        token,
+      ),
+    );
+  }
+
+  function withSession(body: string, token: string, sessionId: string) {
+    return new Request("http://localhost/api/mcp", {
+      method: "POST",
+      headers: {
+        ...MCP_HEADERS,
+        authorization: `Bearer ${token}`,
+        "mcp-session-id": sessionId,
+      },
+      body,
+    });
+  }
+
+  it("returns a session id from initialize", async () => {
+    const { context } = await signUpTestUser("sess");
+    const token = await keyFor(context);
+
+    const response = await initialize(token);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("mcp-session-id")).toMatch(/[0-9a-f-]{36}/);
+  });
+
+  it("reuses the session for a later tool call", async () => {
+    const { context } = await signUpTestUser("sess2");
+    await createTestTeam(context, "Session Team");
+    const token = await keyFor(context);
+    const sessionId = (await initialize(token)).headers.get("mcp-session-id")!;
+
+    const response = await serveMcp(
+      withSession(
+        rpc("tools/call", { name: "list_teams", arguments: {} }, 2),
+        token,
+        sessionId,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("Session Team");
+  });
+
+  it("refuses another user's session id as if it did not exist", async () => {
+    const { context: ownerCtx } = await signUpTestUser("sessowner");
+    await createTestTeam(ownerCtx, "Private Team");
+    const ownerToken = await keyFor(ownerCtx);
+    const sessionId = (await initialize(ownerToken)).headers.get(
+      "mcp-session-id",
+    )!;
+
+    const { context: strangerCtx } = await signUpTestUser("stranger2");
+    const strangerToken = await keyFor(strangerCtx);
+
+    const response = await serveMcp(
+      withSession(
+        rpc("tools/call", { name: "list_teams", arguments: {} }, 2),
+        strangerToken,
+        sessionId,
+      ),
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).not.toContain("Private Team");
+  });
+
+  it("refuses an unknown session id", async () => {
+    const { context } = await signUpTestUser("sess3");
+    const token = await keyFor(context);
+
+    const response = await serveMcp(
+      withSession(
+        rpc("tools/list", {}, 2),
+        token,
+        "00000000-0000-4000-8000-000000000000",
+      ),
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("still requires a credential even with a valid session id", async () => {
+    const { context } = await signUpTestUser("sess4");
+    const token = await keyFor(context);
+    const sessionId = (await initialize(token)).headers.get("mcp-session-id")!;
+
+    const response = await serveMcp(
+      new Request("http://localhost/api/mcp", {
+        method: "POST",
+        headers: { ...MCP_HEADERS, "mcp-session-id": sessionId },
+        body: rpc("tools/list", {}, 2),
+      }),
+    );
+
+    expect(response.status).toBe(401);
   });
 });
