@@ -348,6 +348,16 @@ Postgres + a `uploads` volume for assets.
 
 ### File uploads
 
+- **Drag and drop:** wrap any area in `<FileDropZone onUploaded accept? label?
+  disabled?>` (`~/components/custom/FileUploads`) to make it take dropped
+  files — already on the demo gallery, card attachments and the deck editor.
+  Both it and `<UploadButton>` go through the shared `useFileUpload` hook, so
+  they cannot drift; dropping several files uploads them SEQUENTIALLY (the
+  endpoint takes one per call). Client-side triage lives in `~/lib/fileDrop.ts`
+  (`triageFiles`/`matchesAccept`/`rejectionMessage`, unit-tested): oversized or
+  wrong-typed files are refused with a toast before any request. `dragHasFiles`
+  keeps the overlay from flashing during @dnd-kit kanban drags, and a
+  window-level guard stops a stray drop from navigating the tab away.
 - Upload via `rpc.file.upload` (`{ file: File }`, auth required, ≤20MB) →
   returns `{ id, path, name, type, url }`. **ANY file type is accepted** —
   size is the only limit (there is no mime allowlist; safety lives on the

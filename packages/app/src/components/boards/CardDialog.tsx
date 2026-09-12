@@ -1,11 +1,18 @@
 import { useMutation } from "@tanstack/react-query";
-import { ArchiveIcon, ArrowLeftIcon, ArrowRightIcon, LinkIcon, XIcon } from "lucide-react";
+import {
+  ArchiveIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  LinkIcon,
+  XIcon,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AssigneeCombobox } from "~/components/custom/AssigneeCombobox";
 import { TagCombobox } from "~/components/custom/TagCombobox";
 import { MessageThread } from "~/components/custom/MessageThread";
 import {
+  FileDropZone,
   FilePreview,
   UploadButton,
 } from "~/components/custom/FileUploads";
@@ -29,8 +36,7 @@ import {
 import { cn } from "~/lib/classUtils";
 import { rpc, type Outputs } from "~/lib/rpcClient";
 
-type BoardCard =
-  Outputs["board"]["get"]["columns"][number]["cards"][number];
+type BoardCard = Outputs["board"]["get"]["columns"][number]["cards"][number];
 
 type RelationKind = "related" | "blocks" | "blocked_by";
 
@@ -85,10 +91,14 @@ export function CardDialog({
     pending.current = {};
     // Never persist an empty title (the column header would go blank).
     if (patch.title !== undefined && !patch.title.trim()) delete patch.title;
-    if (Object.keys(patch).length > 0) updateCard({ cardId: card.id, ...patch });
+    if (Object.keys(patch).length > 0)
+      updateCard({ cardId: card.id, ...patch });
   }
 
-  function scheduleSave(patch: { title?: string; description?: string | null }) {
+  function scheduleSave(patch: {
+    title?: string;
+    description?: string | null;
+  }) {
     pending.current = { ...pending.current, ...patch };
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(flush, 2000);
@@ -131,8 +141,7 @@ export function CardDialog({
   const [relationKind, setRelationKind] = useState<RelationKind>("related");
   // Cards available for a new relation: not self, not already linked.
   const relatableCards = boardCards.filter(
-    (c) =>
-      c.id !== card.id && !card.relations.some((r) => r.cardId === c.id),
+    (c) => c.id !== card.id && !card.relations.some((r) => r.cardId === c.id),
   );
 
   return (
@@ -284,9 +293,15 @@ export function CardDialog({
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <FileDropZone
+          className="flex flex-col gap-1.5"
+          label="Drop to attach"
+          onUploaded={(file) =>
+            addAttachment({ cardId: card.id, fileId: file.id })
+          }
+        >
           <Label>Attachments</Label>
-          {card.attachments.length > 0 && (
+          {card.attachments.length > 0 ? (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {card.attachments.map((att) => (
                 <div
@@ -309,6 +324,12 @@ export function CardDialog({
                 </div>
               ))}
             </div>
+          ) : (
+            // Something to aim at: with no attachments there was nothing to
+            // drop onto but the bare button.
+            <p className="rounded-md border border-dashed border-card-border p-4 text-center text-xs text-muted-foreground">
+              Drop files here to attach them.
+            </p>
           )}
           <div>
             <UploadButton
@@ -318,7 +339,7 @@ export function CardDialog({
               }
             />
           </div>
-        </div>
+        </FileDropZone>
 
         <div className="flex flex-col gap-1.5">
           <Label>Comments</Label>

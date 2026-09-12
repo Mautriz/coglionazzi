@@ -20,7 +20,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { NewGameDialog } from "~/components/games/NewGameDialog";
-import { UploadButton } from "~/components/custom/FileUploads";
+import { FileDropZone, UploadButton } from "~/components/custom/FileUploads";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -153,24 +153,35 @@ function RouteComponent() {
         )}
       </div>
 
-      {deck.cards.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-card-border p-6 text-center text-sm text-muted-foreground">
-          {editable
-            ? "No images yet — upload a few. You need at least 2 to play (and a power of 2 to fill a bracket). Not your deck? Clone it to make it editable."
-            : "This deck has no images yet."}
-        </p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          {deck.cards.map((card) => (
-            <CardTile
-              key={card.id}
-              card={card}
-              editable={editable}
-              onChanged={refresh}
-            />
-          ))}
-        </div>
-      )}
+      <FileDropZone
+        // Only the deck's owner can add images; for everyone else this renders
+        // as a plain wrapper with no drop affordance.
+        disabled={!editable}
+        accept="image/*"
+        label="Drop images to add"
+        onUploaded={(file) =>
+          addCard({ deckId, fileId: file.id, title: file.name })
+        }
+      >
+        {deck.cards.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-card-border p-6 text-center text-sm text-muted-foreground">
+            {editable
+              ? "No images yet — drop a few here, or use the upload button. You need at least 2 to play (and a power of 2 to fill a bracket). Not your deck? Clone it to make it editable."
+              : "This deck has no images yet."}
+          </p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            {deck.cards.map((card) => (
+              <CardTile
+                key={card.id}
+                card={card}
+                editable={editable}
+                onChanged={refresh}
+              />
+            ))}
+          </div>
+        )}
+      </FileDropZone>
 
       {editable && (
         <div className="mt-4 border-t border-card-border pt-4">
@@ -180,7 +191,11 @@ function RouteComponent() {
             size="sm"
             className="text-destructive hover:text-destructive"
             onClick={() => {
-              if (window.confirm(`Delete deck "${deck.name}"? This can't be undone.`)) {
+              if (
+                window.confirm(
+                  `Delete deck "${deck.name}"? This can't be undone.`,
+                )
+              ) {
                 deleteDeck({ deckId });
               }
             }}
