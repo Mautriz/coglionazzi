@@ -5,7 +5,6 @@ describe("isAllowedOAuthRedirect", () => {
   it.each([
     "https://claude.ai/api/mcp/auth_callback",
     "https://claude.com/api/mcp/auth_callback",
-    "https://app.claude.ai/callback",
     "http://localhost:5555/callback",
     "http://127.0.0.1:9797/callback",
     "http://[::1]:6274/oauth/callback",
@@ -18,6 +17,8 @@ describe("isAllowedOAuthRedirect", () => {
     "http://claude.ai/api/mcp/auth_callback",
     "https://claude.ai.evil.example/callback",
     "https://notclaude.ai/callback",
+    // Exact host match only — a subdomain could host an open redirect.
+    "https://app.claude.ai/callback",
     "https://localhost.evil.example/callback",
     "http://127.0.0.1:9797/cb,https://evil.example/callback",
     "javascript:alert(1)",

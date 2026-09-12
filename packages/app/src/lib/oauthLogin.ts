@@ -20,11 +20,20 @@ export function continueOAuthFlow(continueUrl: string): void {
   window.location.assign(continueUrl);
 }
 
-/** The plugin's after-login hook may answer the sign-in request itself with a
- *  redirect to the OAuth client, which the browser's fetch cannot follow
- *  cross-origin — the call then reports an error even though the session
- *  cookie was set. So on error, ask the server whether we ARE signed in and,
- *  if so, continue the flow. Returns true when it took over. */
+/** The plugin's after-login hook answers the sign-in request ITSELF with a
+ *  302 to the OAuth client's callback carrying a code. The browser's fetch
+ *  follows that redirect but cannot read the cross-origin response, so the
+ *  sign-in call reports an error even though the session cookie was set. On
+ *  error, then, ask the server whether we ARE signed in and, if so, continue
+ *  the flow. Returns true when it took over.
+ *
+ *  Consequence worth knowing: that background fetch has already delivered one
+ *  code to the client, and the navigation below mints a second. Both go to the
+ *  registered redirect URI, so this is safe — but a loopback client that shuts
+ *  its listener down after the first code leaves the user's tab on a dead
+ *  127.0.0.1 URL. The connection has succeeded by then. Suppressing the first
+ *  code would need `redirect: "manual"` on the sign-in fetch, which is only
+ *  worth doing once someone can test it in a real browser. */
 export async function continueOAuthIfSignedIn(
   continueUrl: string,
 ): Promise<boolean> {

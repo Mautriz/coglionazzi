@@ -2,14 +2,19 @@
  *  anonymous and there is no consent screen, so THIS is what stops a rogue
  *  client from collecting codes: a code can only ever land on Anthropic's
  *  callback (claude.ai binds the flow to the user who started it) or on the
- *  user's own machine (Claude Code, the MCP inspector). Subdomains allowed. */
+ *  user's own machine (Claude Code, the MCP inspector).
+ *
+ *  EXACT host match, no subdomains: real clients only ever use
+ *  `https://claude.ai/api/mcp/auth_callback`, so a wildcard would buy nothing
+ *  and would forward codes off-platform if any subdomain ever hosted an open
+ *  redirect or user content. Adding a host means editing this list. */
 export const OAUTH_REDIRECT_HOSTS = ["claude.ai", "claude.com"] as const;
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 /** True when `uri` is an acceptable `redirect_uri` for a registering client:
- *  https on an allowed host (or a subdomain of one), or http/https on
- *  loopback with any port. Anything unparsable is refused. */
+ *  https on exactly one of the allowed hosts, or http/https on loopback with
+ *  any port. Anything unparsable is refused. */
 export function isAllowedOAuthRedirect(uri: string): boolean {
   // better-auth stores the whole list as `redirect_uris.join(",")` and splits
   // it back on "," at authorize time, so a comma INSIDE one entry silently
@@ -29,7 +34,5 @@ export function isAllowedOAuthRedirect(uri: string): boolean {
   }
 
   if (url.protocol !== "https:") return false;
-  return OAUTH_REDIRECT_HOSTS.some(
-    (host) => url.hostname === host || url.hostname.endsWith(`.${host}`),
-  );
+  return OAUTH_REDIRECT_HOSTS.some((host) => url.hostname === host);
 }

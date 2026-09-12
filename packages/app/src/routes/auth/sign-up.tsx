@@ -60,9 +60,10 @@ function RouteComponent() {
             router.navigate({ to: "/home" });
           },
           async onError(e) {
-            // The mcp plugin's after-login hook may answer this very request
-            // with a cross-origin redirect, which fetch reports as an error
-            // even though the session cookie was set (see lib/oauthLogin.ts).
+            // The mcp plugin's after-login hook answers this very request
+            // with a cross-origin redirect; fetch follows it but can't read
+            // the response, so a successful login surfaces here as an error
+            // (see lib/oauthLogin.ts).
             if (continueUrl && (await continueOAuthIfSignedIn(continueUrl))) {
               return;
             }

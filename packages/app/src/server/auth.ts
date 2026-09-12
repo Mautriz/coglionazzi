@@ -41,8 +41,11 @@ export const auth = betterAuth({
       const refused = list.filter(
         (uri) => typeof uri !== "string" || !isAllowedOAuthRedirect(uri),
       );
-      // The empty-list leg is redundant defence: better-auth's own zod schema
-      // already requires a non-empty `redirect_uris`.
+      // The empty-list leg is load-bearing, NOT redundant: better-auth's zod
+      // schema is `z.array(z.string())` with no `.min(1)`, and its own
+      // emptiness check only fires for the authorization_code/implicit grant
+      // types — so `{grant_types:["client_credentials"], redirect_uris:[]}`
+      // would otherwise register a client with an empty redirect list.
       if (list.length === 0 || refused.length > 0) {
         throw new APIError("BAD_REQUEST", {
           error: "invalid_redirect_uri",
@@ -65,6 +68,9 @@ export const auth = betterAuth({
       // RFC 9728 resource identifier = the protected endpoint itself.
       resource: `${frontendUrl}/api/mcp`,
       oidcConfig: {
+        // MCP clients all use PKCE; requiring it means a code is useless to
+        // anyone who did not start the flow.
+        requirePKCE: true,
         // `mcp()` overwrites this with the option above at runtime, but the
         // underlying OIDCOptions type marks it required — pass the same const.
         loginPage: OAUTH_LOGIN_PAGE,

@@ -79,6 +79,54 @@ describe("OAuth authorization server (better-auth mcp plugin)", () => {
     expect(grant?.userId).toBe(userId);
   });
 
+  it("refuses to issue a code to a redirect_uri the client never registered", async () => {
+    // The allowlist only protects registration; everything downstream rests on
+    // better-auth exact-matching redirect_uri against the stored list. If that
+    // ever regressed, the guard would be worthless — so pin it here.
+    const { context } = await signUpTestUser("ivy");
+    const clientId = await registerOAuthClient();
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: "https://evil.example/cb",
+      response_type: "code",
+      scope: "openid profile email",
+      state: "s",
+      code_challenge: pkcePair().challenge,
+      code_challenge_method: "S256",
+    });
+
+    const res = await auth.handler(
+      new Request(`${AUTH_ORIGIN}/api/auth/mcp/authorize?${params}`, {
+        headers: { cookie: cookieOf(context) },
+      }),
+    );
+
+    // Assert the specific branch, not just "no code anywhere": an unregistered
+    // redirect_uri is a hard 400 with no redirect at all.
+    expect(res.status).toBe(400);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("refuses an authorize request that omits PKCE", async () => {
+    const { context } = await signUpTestUser("jack");
+    const clientId = await registerOAuthClient();
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: REDIRECT_URI,
+      response_type: "code",
+      scope: "openid profile email",
+      state: "s",
+    });
+
+    const res = await auth.handler(
+      new Request(`${AUTH_ORIGIN}/api/auth/mcp/authorize?${params}`, {
+        headers: { cookie: cookieOf(context) },
+      }),
+    );
+
+    expect(res.headers.get("location") ?? "").not.toContain("code=");
+  });
+
   it("rejects a code exchange with the wrong PKCE verifier", async () => {
     const { context } = await signUpTestUser("bob");
     const clientId = await registerOAuthClient();

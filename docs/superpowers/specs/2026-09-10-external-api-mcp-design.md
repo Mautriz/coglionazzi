@@ -429,11 +429,16 @@ Anonymous dynamic client registration plus no consent means a rogue client
 could otherwise mail a logged-in member an authorize link and collect a
 30-day token. `server/oauthRedirects.ts` (`isAllowedOAuthRedirect`, enforced
 by a `hooks.before` guard on `/mcp/register`) accepts only https URLs on
-claude.ai / claude.com and loopback — and refuses any URI containing a comma,
+exactly claude.ai / claude.com (no subdomains — real clients use one fixed
+callback, and a wildcard would forward codes off-platform if any subdomain
+ever hosted an open redirect) and loopback — and refuses any URI containing a comma,
 because better-auth stores `redirect_uris.join(",")` and splits it back at
 authorize time, so a comma inside one entry would register an unchecked second
 target. Residual risk: a code can still be delivered to the victim's own
 loopback, which no third party can read.
+
+PKCE is required (`requirePKCE`), and a test pins the property the whole model
+rests on: authorize refuses a `redirect_uri` the client never registered.
 
 **Deliberately not built:** consent screen, scopes, a token-revocation UI,
 rate limiting on the public register/token endpoints (same posture as the
