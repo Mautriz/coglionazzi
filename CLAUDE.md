@@ -233,6 +233,16 @@ Postgres + a `uploads` volume for assets.
   login need — dynamic client registration, PKCE (required — `requirePKCE`), authorize/token/refresh
   under `/api/auth/mcp/*`, discovery docs under `/api/auth/.well-known/*` AND
   at the site root (`routes/[.]well-known/`, where clients actually look).
+  **Dynamically registered clients default to PUBLIC** (the register hook sets
+  `token_endpoint_auth_method: "none"` when the client didn't pick one):
+  better-auth would otherwise make them confidential, and the token endpoint
+  then rejects the secret-less exchange an MCP client performs with
+  "client_secret is required for confidential clients". A public client must
+  use PKCE end-to-end (the plugin demands a verifier at the token step);
+  PKCE is NOT required at authorize, because requiring it turned connectors
+  away and our metadata only advertises that S256 is supported. Failed
+  handshakes are logged (`[oauth] …` from the after-hook) — the connector UI
+  only ever says "Authorization failed", so the log is the only diagnosis.
   Tables `oauth_applications` / `oauth_access_tokens` / `oauth_consents`
   (migration `…013`, snake_case via `oidcConfig.schema` — that map reaches the
   adapter through oidcProvider's in-place `mergeSchema`, and `oauth.test.ts`'s

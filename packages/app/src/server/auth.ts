@@ -35,6 +35,22 @@ export const auth = betterAuth({
   },
 
   hooks: {
+    // Diagnostics for the OAuth handshake. Connector failures surface to the
+    // user as one opaque line ("Authorization failed"), and every detail that
+    // says WHY lives here — the redirect carries `error=`/`error_description`
+    // and the token endpoint answers a JSON error. Without this the only way
+    // to tell a bad scope from a bad client type is to guess.
+    after: createAuthMiddleware(async (ctx) => {
+      if (!ctx.path.startsWith("/mcp/")) return;
+      const location = ctx.context.responseHeaders?.get("location") ?? "";
+      if (location.includes("error=")) {
+        const params = new URL(location, frontendUrl).searchParams;
+        console.warn(
+          `[oauth] ${ctx.path} refused: ${params.get("error")} — ${params.get("error_description") ?? ""}`,
+        );
+      }
+    }),
+
     // Dynamic client registration is anonymous and the mcp plugin issues codes
     // without a consent screen, so the redirect_uri allowlist is the ONLY
     // thing keeping a rogue client from harvesting codes via a shared link.
@@ -45,6 +61,19 @@ export const auth = betterAuth({
       const refused = list.filter(
         (uri) => typeof uri !== "string" || !isAllowedOAuthRedirect(uri),
       );
+
+      // Default a dynamically registered client to PUBLIC. better-auth
+      // otherwise defaults to `client_secret_basic`, which makes the client
+      // confidential — and the token endpoint then rejects the secret-less,
+      // PKCE-style exchange that MCP clients actually perform, with
+      // "client_secret is required for confidential clients". A public client
+      // is the right shape here anyway: these are apps and CLIs that cannot
+      // keep a secret, and where a code can be delivered is already bounded by
+      // the redirect allowlist. A client that explicitly asks for a
+      // secret-based method still gets one.
+      if (ctx.body && ctx.body.token_endpoint_auth_method === undefined) {
+        ctx.body.token_endpoint_auth_method = "none";
+      }
       // The empty-list leg is load-bearing, NOT redundant: better-auth's zod
       // schema is `z.array(z.string())` with no `.min(1)`, and its own
       // emptiness check only fires for the authorization_code/implicit grant
@@ -72,9 +101,12 @@ export const auth = betterAuth({
       // RFC 9728 resource identifier = the protected endpoint itself.
       resource: `${frontendUrl}/api/mcp`,
       oidcConfig: {
-        // MCP clients all use PKCE; requiring it means a code is useless to
-        // anyone who did not start the flow.
-        requirePKCE: true,
+        // PKCE is verified whenever a client sends a challenge, but NOT
+        // required: our metadata advertises `code_challenge_methods_supported`
+        // (we support S256), which is not a promise to reject clients that
+        // omit it — and requiring it turned real connectors away with
+        // "pkce is required". Code interception is already bounded by the
+        // redirect allowlist below.
         // `mcp()` overwrites this with the option above at runtime, but the
         // underlying OIDCOptions type marks it required — pass the same const.
         loginPage: OAUTH_LOGIN_PAGE,

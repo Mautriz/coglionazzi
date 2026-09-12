@@ -108,7 +108,10 @@ describe("OAuth authorization server (better-auth mcp plugin)", () => {
     expect(res.headers.get("location")).toBeNull();
   });
 
-  it("refuses an authorize request that omits PKCE", async () => {
+  it("still issues a code to a client that omits PKCE", async () => {
+    // Deliberate: requiring PKCE turned real connectors away, and our metadata
+    // only advertises that we SUPPORT S256. PKCE is still verified when sent
+    // (see the wrong-verifier test below).
     const { context } = await signUpTestUser("jack");
     const clientId = await registerOAuthClient();
     const params = new URLSearchParams({
@@ -125,7 +128,71 @@ describe("OAuth authorization server (better-auth mcp plugin)", () => {
       }),
     );
 
-    expect(res.headers.get("location") ?? "").not.toContain("code=");
+    expect(res.headers.get("location") ?? "").toContain("code=");
+  });
+
+  it("registers a client as public when it does not say otherwise", async () => {
+    // better-auth would default to client_secret_basic, and the secret-less
+    // exchange an MCP client performs would then fail with
+    // "client_secret is required for confidential clients".
+    const res = await auth.handler(
+      new Request(`${AUTH_ORIGIN}/api/auth/mcp/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          client_name: "No auth method declared",
+          redirect_uris: [REDIRECT_URI],
+        }),
+      }),
+    );
+
+    const body = (await res.json()) as {
+      token_endpoint_auth_method: string;
+      client_secret?: string;
+    };
+    expect(body.token_endpoint_auth_method).toBe("none");
+    expect(body.client_secret ?? "").toBe("");
+  });
+
+  it("completes a token exchange for a client that never declared itself public", async () => {
+    const { context, userId } = await signUpTestUser("kim");
+    const registered = await auth.handler(
+      new Request(`${AUTH_ORIGIN}/api/auth/mcp/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          client_name: "Connector",
+          redirect_uris: [REDIRECT_URI],
+          grant_types: ["authorization_code", "refresh_token"],
+          response_types: ["code"],
+        }),
+      }),
+    );
+    const { client_id: clientId } = (await registered.json()) as {
+      client_id: string;
+    };
+    const { verifier, challenge } = pkcePair();
+    const code = (await authorizeAs(cookieOf(context), clientId, challenge))
+      .searchParams.get("code")!;
+
+    const token = await exchangeCode(clientId, code, verifier);
+
+    const grant = await auth.api.getMcpSession({
+      headers: new Headers({ authorization: `Bearer ${token.access_token}` }),
+    });
+    expect(grant?.userId).toBe(userId);
+  });
+
+  it("keeps verifying PKCE when the client does send it", async () => {
+    const { context } = await signUpTestUser("liam");
+    const clientId = await registerOAuthClient();
+    const { challenge } = pkcePair();
+    const code = (await authorizeAs(cookieOf(context), clientId, challenge))
+      .searchParams.get("code")!;
+
+    await expect(
+      exchangeCode(clientId, code, "not-the-verifier"),
+    ).rejects.toThrow(/token failed/);
   });
 
   it("rejects a code exchange with the wrong PKCE verifier", async () => {
