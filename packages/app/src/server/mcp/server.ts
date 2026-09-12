@@ -37,9 +37,16 @@ export function createMcpServer(ctx: ToolCtx): McpServer {
   return server;
 }
 
-/** Serve one MCP request. Stateless: a fresh server + transport per request,
- *  which is what a single request/response POST route wants (there is no
- *  session to resume and nothing to keep in memory between calls). */
+/** Serve one MCP request. Stateless: a fresh server + transport per request
+ *  (there is no session to resume and nothing to keep in memory between
+ *  calls). The transport handles POST, and also GET — the standalone SSE
+ *  stream a Streamable HTTP client opens to receive server-initiated
+ *  messages. We hand GET straight to it rather than answering 405 ourselves:
+ *  a client that treats the stream as required otherwise gives up right after
+ *  a successful `initialize`, which looks like "the server is unreachable".
+ *
+ *  A GET answers with a stream that stays open, so the server must NOT be
+ *  closed when `handleRequest` returns — only once the body is done. */
 export async function handleMcpRequest(
   request: Request,
   context: ORPCContext,
@@ -53,9 +60,37 @@ export async function handleMcpRequest(
 
   await server.connect(transport);
 
+  let response: Response;
   try {
-    return await transport.handleRequest(request);
-  } finally {
+    response = await transport.handleRequest(request);
+  } catch (err) {
     await server.close();
+    throw err;
   }
+
+  const streaming =
+    response.headers.get("content-type")?.includes("text/event-stream") ===
+      true && response.body !== null;
+
+  if (!streaming) {
+    await server.close();
+    return response;
+  }
+
+  // Tie the server's lifetime to the stream: closing it early would cut the
+  // SSE connection the client is waiting on, and never closing it would leak
+  // one server per stream.
+  const body = response.body!.pipeThrough(
+    new TransformStream({
+      flush: () => {
+        void server.close();
+      },
+    }),
+  );
+
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }

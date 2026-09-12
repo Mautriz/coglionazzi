@@ -104,8 +104,16 @@ function withAcceptableHeaders(request: Request, body: string): Request {
   ) {
     headers.set("accept", "application/json, text/event-stream");
   }
-  // `serveMcp` already consumed the original stream, so always rebuild.
-  return new Request(request.url, { method: request.method, headers, body });
+
+  // `serveMcp` already consumed the original stream, so always rebuild — but
+  // a GET (the standalone SSE stream) must not carry one, or the Request
+  // constructor throws.
+  const carriesBody = request.method !== "GET" && request.method !== "HEAD";
+  return new Request(request.url, {
+    method: request.method,
+    headers,
+    ...(carriesBody && body ? { body } : {}),
+  });
 }
 
 /** The MCP endpoint. Authenticated by a bearer credential ONLY — an `ins_…`

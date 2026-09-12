@@ -801,7 +801,14 @@ Postgres + a `uploads` volume for assets.
   `docker compose logs -f app | grep "\[mcp\]"`. Secrets never reach it: an
   API key shows only its public `ins_` prefix, an OAuth token only its length,
   a cookie only present/none, and tool params are never printed. Set
-  `MCP_LOG=verbose` to also dump every other non-secret header. **Every response carries CORS**
+  `MCP_LOG=verbose` to also dump every other non-secret header.
+- **GET and DELETE go through the SDK too**, not a hand-written 405. GET opens
+  the standalone SSE stream a Streamable HTTP client uses for server-initiated
+  messages; a client that treats it as required otherwise gives up right after
+  a successful `initialize`, which reads as "the server is unreachable". Both
+  are authenticated and logged like POST. Because the GET response is a stream
+  that stays open, `handleMcpRequest` closes the MCP server when the body
+  finishes rather than when the handler returns. **Every response carries CORS**
   (`MCP_CORS_HEADERS` + an `OPTIONS` handler): a connector configured inside a
   web app sends `Authorization` cross-origin, which forces a preflight, and
   without it the browser blocks the request and the server looks unreachable

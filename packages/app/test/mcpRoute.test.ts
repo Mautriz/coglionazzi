@@ -347,3 +347,46 @@ describe("MCP endpoint Accept handling", () => {
     expect(response.status).toBe(401);
   });
 });
+
+describe("MCP standalone SSE stream (GET)", () => {
+  // A Streamable HTTP client may open a GET stream for server-initiated
+  // messages right after initialize. We used to answer 405 from the route
+  // file, unauthenticated and unlogged, which made such a client give up
+  // immediately after a successful handshake.
+  function get(token?: string): Request {
+    return new Request("http://localhost/api/mcp", {
+      method: "GET",
+      headers: {
+        accept: "text/event-stream",
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+    });
+  }
+
+  it("requires a credential, like every other method", async () => {
+    const response = await serveMcp(get());
+
+    expect(response.status).toBe(401);
+  });
+
+  it("opens an event stream for an authenticated client", async () => {
+    const { context } = await signUpTestUser("streamer");
+    const token = await keyFor(context);
+
+    const response = await serveMcp(get(token));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    await response.body?.cancel();
+  });
+
+  it("puts CORS on the stream too", async () => {
+    const { context } = await signUpTestUser("streamer2");
+    const token = await keyFor(context);
+
+    const response = await serveMcp(get(token));
+
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    await response.body?.cancel();
+  });
+});

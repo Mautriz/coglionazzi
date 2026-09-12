@@ -1,9 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  MCP_CORS_HEADERS,
-  mcpPreflight,
-  serveMcp,
-} from "../../server/mcp/route";
+import { mcpPreflight, serveMcp } from "../../server/mcp/route";
 
 /** MCP endpoint for external clients — claude.ai custom connectors and Claude
  *  Code. Two ways in:
@@ -23,18 +19,12 @@ export const Route = createFileRoute("/api/mcp")({
       // carries an Authorization header. Without this the real request is
       // never sent and the server looks unreachable.
       OPTIONS: () => mcpPreflight(),
-      // Streamable HTTP clients may probe GET/DELETE for a resumable session;
-      // this server is stateless, so say so rather than 404ing.
-      GET: () =>
-        new Response("Method Not Allowed", {
-          status: 405,
-          headers: MCP_CORS_HEADERS,
-        }),
-      DELETE: () =>
-        new Response("Method Not Allowed", {
-          status: 405,
-          headers: MCP_CORS_HEADERS,
-        }),
+      // GET opens the standalone SSE stream and DELETE ends a session. Both go
+      // through `serveMcp` so they are authenticated, logged, and handled by
+      // the MCP SDK — answering 405 here ourselves made a client that opens
+      // the stream give up right after a successful initialize, invisibly.
+      GET: ({ request }) => serveMcp(request),
+      DELETE: ({ request }) => serveMcp(request),
     },
   },
 });
