@@ -79,6 +79,32 @@ const unauthorized = (request: Request, message: string): Response =>
     },
   });
 
+/** The SDK's Streamable HTTP transport answers 406 unless `Accept` lists BOTH
+ *  `application/json` and `text/event-stream` — and its check is a literal
+ *  substring test, so even a wildcard Accept is refused. Real clients do not
+ *  all send that exact pair, and the failure surfaces to the user as an
+ *  unhelpful "couldn't reach the server".
+ *
+ *  Our transport runs with `enableJsonResponse`, so it only ever replies with
+ *  JSON and never actually needs the client to speak SSE. Normalising the
+ *  header is therefore honest rather than a fudge: be liberal in what we
+ *  accept, and keep answering exactly what we always did. */
+async function withAcceptableHeaders(request: Request): Promise<Request> {
+  const accept = request.headers.get("accept") ?? "";
+  if (
+    accept.includes("application/json") &&
+    accept.includes("text/event-stream")
+  ) {
+    return request;
+  }
+
+  const headers = new Headers(request.headers);
+  headers.set("accept", "application/json, text/event-stream");
+  // The body is a one-shot stream, so read it before rebuilding the request.
+  const body = await request.arrayBuffer();
+  return new Request(request.url, { method: request.method, headers, body });
+}
+
 /** The MCP endpoint. Authenticated by a bearer credential ONLY — an `ins_…`
  *  API key or an OAuth access token from better-auth's mcp plugin. This is the
  *  external surface, so a browser session cookie deliberately does not grant
@@ -106,7 +132,7 @@ export async function serveMcp(request: Request): Promise<Response> {
 
   return withCors(
     await handleMcpRequest(
-      request,
+      await withAcceptableHeaders(request),
       {
         // The tools call oRPC procedures, which resolve the caller from these
         // headers exactly as they would for any HTTP request.

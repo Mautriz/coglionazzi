@@ -787,7 +787,12 @@ Postgres + a `uploads` volume for assets.
   reachable cross-site from a logged-in user's browser. A 401 carries
   `WWW-Authenticate: Bearer … resource_metadata="<origin>/.well-known/oauth-protected-resource"`
   (RFC 9728), which is how an OAuth client discovers the authorization server
-  and starts the login flow by itself. **Every response carries CORS**
+  and starts the login flow by itself. **The `Accept` header is normalised
+  before the SDK sees it** (`withAcceptableHeaders`): the transport 406s unless
+  Accept literally contains both `application/json` and `text/event-stream`,
+  so a client sending a wildcard, json-only, or nothing at all was refused and
+  reported the server as unreachable. We run with `enableJsonResponse` and
+  always answer JSON, so widening this changes no reply we send. **Every response carries CORS**
   (`MCP_CORS_HEADERS` + an `OPTIONS` handler): a connector configured inside a
   web app sends `Authorization` cross-origin, which forces a preflight, and
   without it the browser blocks the request and the server looks unreachable

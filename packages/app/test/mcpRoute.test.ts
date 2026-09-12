@@ -300,3 +300,50 @@ describe("MCP endpoint CORS", () => {
     expect(response.headers.get("access-control-allow-origin")).toBe("*");
   });
 });
+
+describe("MCP endpoint Accept handling", () => {
+  // The SDK transport 406s unless Accept lists BOTH json and event-stream, by
+  // literal substring — so even a wildcard fails. Clients that send anything
+  // else saw "couldn't reach the server". We answer JSON regardless.
+  async function initializeWith(accept: string | null, token: string) {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`,
+    };
+    if (accept !== null) headers.accept = accept;
+
+    return serveMcp(
+      new Request("http://localhost/api/mcp", {
+        method: "POST",
+        headers,
+        body: rpc("initialize", {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "test", version: "1.0.0" },
+        }),
+      }),
+    );
+  }
+
+  const acceptCases: Array<[string | null, string]> = [
+    ["application/json, text/event-stream", "both, the strict pair"],
+    ["application/json", "json only"],
+    ["*/*", "a wildcard"],
+    [null, "no Accept header at all"],
+  ];
+
+  it.each(acceptCases)("serves a client sending %s (%s)", async (accept) => {
+    const { context } = await signUpTestUser("accept");
+    const token = await keyFor(context);
+
+    const response = await initializeWith(accept, token);
+
+    expect(response.status).toBe(200);
+  });
+
+  it("still authenticates before touching the body", async () => {
+    const response = await initializeWith("*/*", "ins_bogus");
+
+    expect(response.status).toBe(401);
+  });
+});
