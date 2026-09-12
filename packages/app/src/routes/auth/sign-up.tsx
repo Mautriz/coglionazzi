@@ -8,6 +8,11 @@ import { AuthDivider, DiscordSignInButton } from "~/components/custom/SocialAuth
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardTitle } from "~/components/ui/card";
 import { authClient } from "~/lib/authClient";
+import {
+  continueOAuthFlow,
+  continueOAuthIfSignedIn,
+  useOAuthContinueUrl,
+} from "~/lib/oauthLogin";
 import { reconnectRealtimeSocket } from "~/lib/wsClient";
 
 const FormSchema = z.object({
@@ -25,6 +30,8 @@ export const Route = createFileRoute("/auth/sign-up")({
 function RouteComponent() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  /** Non-null when an OAuth client (claude.ai / Claude Code) sent us here. */
+  const continueUrl = useOAuthContinueUrl();
 
   // Signup goes over HTTP (better-auth sets the session cookie via Set-Cookie,
   // which WS frames can't carry). autoSignIn logs the new user straight in.
@@ -38,6 +45,12 @@ function RouteComponent() {
         },
         {
           onSuccess: async () => {
+            if (continueUrl) {
+              // An OAuth client is waiting for its code — hand the browser to
+              // the authorize endpoint instead of entering the app.
+              continueOAuthFlow(continueUrl);
+              return;
+            }
             // Re-upgrade the realtime socket so it carries the new cookie, and
             // wait for it to re-open before issuing oRPC calls (invalidate) —
             // otherwise they race the reconnect gap and throw.
@@ -46,8 +59,16 @@ function RouteComponent() {
             router.invalidate();
             router.navigate({ to: "/home" });
           },
-          onError(e) {
-            toast("Error", { description: e.error.message });
+          async onError(e) {
+            // The mcp plugin's after-login hook may answer this very request
+            // with a cross-origin redirect, which fetch reports as an error
+            // even though the session cookie was set (see lib/oauthLogin.ts).
+            if (continueUrl && (await continueOAuthIfSignedIn(continueUrl))) {
+              return;
+            }
+            toast("Error", {
+              description: e.error?.message ?? "Could not sign up",
+            });
           },
         },
       );
@@ -72,6 +93,13 @@ function RouteComponent() {
     <Card className="w-full max-w-[440px]">
       <CardContent>
         <CardTitle className="mb-8">Join the crew</CardTitle>
+
+        {continueUrl && (
+          <p className="-mt-4 mb-6 rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+            Sign up to connect Claude to Insacco. Claude will act as this new
+            account, in every team it belongs to.
+          </p>
+        )}
         <form
           className="flex flex-col gap-5"
           onSubmit={(e) => {
@@ -121,10 +149,11 @@ function RouteComponent() {
           </form.AppForm>
 
           <AuthDivider />
-          <DiscordSignInButton />
+          <DiscordSignInButton callbackURL={continueUrl ?? "/home"} />
 
           <LinkWithDescription
             href="/auth/login"
+            preserveSearch
             description="Already have an account?"
             className="text-center"
           >

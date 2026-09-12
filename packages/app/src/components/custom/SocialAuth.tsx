@@ -21,8 +21,16 @@ function DiscordIcon({ className }: { className?: string }) {
  *  session cookie on the callback, then returns to `callbackURL`). Because it's
  *  a hard navigation, the page reloads fresh and the realtime socket re-upgrades
  *  with the new cookie on its own — no `reconnectRealtimeSocket()` needed (unlike
- *  the in-SPA email login/signup). */
-export function DiscordSignInButton() {
+ *  the in-SPA email login/signup).
+ *
+ *  Pass `callbackURL` to land somewhere other than /home — the auth pages
+ *  pass the OAuth authorize URL so an MCP connector's flow continues after
+ *  the Discord round trip (see lib/oauthLogin.ts). */
+export function DiscordSignInButton({
+  callbackURL = "/home",
+}: {
+  callbackURL?: string;
+}) {
   const [pending, setPending] = useState(false);
 
   return (
@@ -35,7 +43,7 @@ export function DiscordSignInButton() {
         setPending(true);
         const { error } = await authClient.signIn.social({
           provider: "discord",
-          callbackURL: "/home",
+          callbackURL,
           // Send OAuth-callback failures (denied consent, link refused, …) back
           // to login instead of better-auth's raw /api/auth/error page.
           errorCallbackURL: "/auth/login",
