@@ -767,7 +767,13 @@ Postgres + a `uploads` volume for assets.
   reachable cross-site from a logged-in user's browser. A 401 carries
   `WWW-Authenticate: Bearer … resource_metadata="<origin>/.well-known/oauth-protected-resource"`
   (RFC 9728), which is how an OAuth client discovers the authorization server
-  and starts the login flow by itself. Also rejects a `Host` that isn't `VITE_FRONTEND_URL`'s
+  and starts the login flow by itself. **Every response carries CORS**
+  (`MCP_CORS_HEADERS` + an `OPTIONS` handler): a connector configured inside a
+  web app sends `Authorization` cross-origin, which forces a preflight, and
+  without it the browser blocks the request and the server looks unreachable
+  while answering curl fine. `Allow-Origin: *` is safe here BECAUSE cookies are
+  refused — a wildcard origin forbids credentialed requests, so no logged-in
+  browser can be made to call it with a session attached. Also rejects a `Host` that isn't `VITE_FRONTEND_URL`'s
   (neither MCP SDK does DNS-rebinding defence). Uses the SDK's
   `WebStandardStreamableHTTPServerTransport` — pure Web Fetch
   (`handleRequest(Request): Promise<Response>`), no Node req/res adapter —

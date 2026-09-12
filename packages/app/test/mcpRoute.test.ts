@@ -1,6 +1,6 @@
 import { call } from "@orpc/server";
 import { describe, expect, it } from "vitest";
-import { serveMcp } from "../src/server/mcp/route";
+import { mcpPreflight, serveMcp } from "../src/server/mcp/route";
 import { apiKeyRouter } from "../src/server/orpc/apiKeys";
 import { boardRouter } from "../src/server/orpc/boards";
 import type { ORPCContext } from "../src/server/orpc/base";
@@ -256,5 +256,47 @@ describe("MCP endpoint with OAuth access tokens", () => {
     const response = await serveMcp(post(rpc("initialize"), token));
 
     expect(response.status).toBe(401);
+  });
+});
+
+describe("MCP endpoint CORS", () => {
+  // A connector configured inside a web app sends `Authorization`
+  // cross-origin, which forces a preflight. Without these headers the browser
+  // blocks the real request and the server looks unreachable while answering
+  // curl perfectly — the exact failure claude.ai reported.
+  it("answers the preflight with the headers a browser needs", () => {
+    const response = mcpPreflight();
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("access-control-allow-methods")).toContain(
+      "POST",
+    );
+    expect(response.headers.get("access-control-allow-headers")).toContain(
+      "Authorization",
+    );
+  });
+
+  it("exposes WWW-Authenticate so a client can read the challenge", () => {
+    expect(
+      mcpPreflight().headers.get("access-control-expose-headers"),
+    ).toContain("WWW-Authenticate");
+  });
+
+  it("puts CORS on the 401 too", async () => {
+    const response = await serveMcp(post(rpc("initialize")));
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("puts CORS on a successful response", async () => {
+    const { context } = await signUpTestUser("cors");
+    const token = await keyFor(context);
+
+    const response = await serveMcp(post(rpc("initialize"), token));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
   });
 });
