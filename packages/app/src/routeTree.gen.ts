@@ -21,6 +21,8 @@ import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as DotwellKnownOauthProtectedResourceRouteImport } from './routes/[.]well-known/oauth-protected-resource'
+import { Route as DotwellKnownOauthAuthorizationServerRouteImport } from './routes/[.]well-known/oauth-authorization-server'
 import { Route as HomeTeamsRouteRouteImport } from './routes/home/teams/route'
 import { Route as PlayGamesIndexRouteImport } from './routes/play/games/index'
 import { Route as HomeTeamsIndexRouteImport } from './routes/home/teams/index'
@@ -100,6 +102,18 @@ const ApiFilesRoute = ApiFilesRouteImport.update({
   path: '/api/files',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotwellKnownOauthProtectedResourceRoute =
+  DotwellKnownOauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DotwellKnownOauthAuthorizationServerRoute =
+  DotwellKnownOauthAuthorizationServerRouteImport.update({
+    id: '/.well-known/oauth-authorization-server',
+    path: '/.well-known/oauth-authorization-server',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const HomeTeamsRouteRoute = HomeTeamsRouteRouteImport.update({
   id: '/teams',
   path: '/teams',
@@ -201,6 +215,8 @@ export interface FileRoutesByFullPath {
   '/play': typeof PlayRouteRouteWithChildren
   '/widget': typeof WidgetRoute
   '/home/teams': typeof HomeTeamsRouteRouteWithChildren
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
   '/api/files': typeof ApiFilesRoute
   '/api/mcp': typeof ApiMcpRoute
   '/auth/login': typeof AuthLoginRoute
@@ -230,6 +246,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
   '/widget': typeof WidgetRoute
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
   '/api/files': typeof ApiFilesRoute
   '/api/mcp': typeof ApiMcpRoute
   '/auth/login': typeof AuthLoginRoute
@@ -262,6 +280,8 @@ export interface FileRoutesById {
   '/play': typeof PlayRouteRouteWithChildren
   '/widget': typeof WidgetRoute
   '/home/teams': typeof HomeTeamsRouteRouteWithChildren
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
   '/api/files': typeof ApiFilesRoute
   '/api/mcp': typeof ApiMcpRoute
   '/auth/login': typeof AuthLoginRoute
@@ -296,6 +316,8 @@ export interface FileRouteTypes {
     | '/play'
     | '/widget'
     | '/home/teams'
+    | '/.well-known/oauth-authorization-server'
+    | '/.well-known/oauth-protected-resource'
     | '/api/files'
     | '/api/mcp'
     | '/auth/login'
@@ -325,6 +347,8 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/widget'
+    | '/.well-known/oauth-authorization-server'
+    | '/.well-known/oauth-protected-resource'
     | '/api/files'
     | '/api/mcp'
     | '/auth/login'
@@ -356,6 +380,8 @@ export interface FileRouteTypes {
     | '/play'
     | '/widget'
     | '/home/teams'
+    | '/.well-known/oauth-authorization-server'
+    | '/.well-known/oauth-protected-resource'
     | '/api/files'
     | '/api/mcp'
     | '/auth/login'
@@ -388,6 +414,8 @@ export interface RootRouteChildren {
   HomeRouteRoute: typeof HomeRouteRouteWithChildren
   PlayRouteRoute: typeof PlayRouteRouteWithChildren
   WidgetRoute: typeof WidgetRoute
+  DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRoute
+  DotwellKnownOauthProtectedResourceRoute: typeof DotwellKnownOauthProtectedResourceRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiMcpRoute: typeof ApiMcpRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -482,6 +510,20 @@ declare module '@tanstack/react-router' {
       path: '/api/files'
       fullPath: '/api/files'
       preLoaderRoute: typeof ApiFilesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof DotwellKnownOauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/oauth-authorization-server': {
+      id: '/.well-known/oauth-authorization-server'
+      path: '/.well-known/oauth-authorization-server'
+      fullPath: '/.well-known/oauth-authorization-server'
+      preLoaderRoute: typeof DotwellKnownOauthAuthorizationServerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/home/teams': {
@@ -702,6 +744,10 @@ const rootRouteChildren: RootRouteChildren = {
   HomeRouteRoute: HomeRouteRouteWithChildren,
   PlayRouteRoute: PlayRouteRouteWithChildren,
   WidgetRoute: WidgetRoute,
+  DotwellKnownOauthAuthorizationServerRoute:
+    DotwellKnownOauthAuthorizationServerRoute,
+  DotwellKnownOauthProtectedResourceRoute:
+    DotwellKnownOauthProtectedResourceRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiMcpRoute: ApiMcpRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
