@@ -5,6 +5,12 @@ import { apiKeyRouter } from "../src/server/orpc/apiKeys";
 import { boardRouter } from "../src/server/orpc/boards";
 import type { ORPCContext } from "../src/server/orpc/base";
 import { createTestTeam, signUpTestUser } from "./helpers";
+import {
+  AUTH_ORIGIN,
+  cookieOf,
+  expireOAuthToken,
+  mintOAuthToken,
+} from "./oauthHelpers";
 
 const MCP_HEADERS = {
   "content-type": "application/json",
@@ -211,5 +217,44 @@ describe("MCP protocol", () => {
     });
 
     expect(body).toContain("Ship the MCP server");
+  });
+});
+
+describe("MCP endpoint with OAuth access tokens", () => {
+  it("tells an OAuth-capable client where the authorization server is (RFC 9728)", async () => {
+    const response = await serveMcp(post(rpc("initialize")));
+
+    expect(response.status).toBe(401);
+    const challenge = response.headers.get("www-authenticate") ?? "";
+    expect(challenge).toMatch(/^Bearer /);
+    // The public origin (VITE_FRONTEND_URL), not the request's host — the
+    // challenge has to name a URL the CLIENT can reach.
+    expect(challenge).toContain(
+      `resource_metadata="${AUTH_ORIGIN}/.well-known/oauth-protected-resource"`,
+    );
+  });
+
+  it("accepts an OAuth access token and acts as its user", async () => {
+    const { context } = await signUpTestUser("grace");
+    await createTestTeam(context, "Grace's crew");
+    const token = await mintOAuthToken(cookieOf(context));
+
+    const { response, body } = await mcpCall(token, "tools/call", {
+      name: "list_teams",
+      arguments: {},
+    });
+
+    expect(response.status).toBe(200);
+    expect(body).toContain("Grace's crew");
+  });
+
+  it("refuses an expired OAuth token", async () => {
+    const { context } = await signUpTestUser("heidi");
+    const token = await mintOAuthToken(cookieOf(context));
+    await expireOAuthToken(token);
+
+    const response = await serveMcp(post(rpc("initialize"), token));
+
+    expect(response.status).toBe(401);
   });
 });
