@@ -1,4 +1,10 @@
 import { resolveBearerCaller } from "../bearerAuth";
+import {
+  describeOutcome,
+  describeRequest,
+  isVerbose,
+  logMcp,
+} from "./log";
 import { handleMcpRequest } from "./server";
 
 /** CORS for the MCP endpoint. A connector configured in a web app (claude.ai)
@@ -89,19 +95,16 @@ const unauthorized = (request: Request, message: string): Response =>
  *  JSON and never actually needs the client to speak SSE. Normalising the
  *  header is therefore honest rather than a fudge: be liberal in what we
  *  accept, and keep answering exactly what we always did. */
-async function withAcceptableHeaders(request: Request): Promise<Request> {
+function withAcceptableHeaders(request: Request, body: string): Request {
   const accept = request.headers.get("accept") ?? "";
-  if (
-    accept.includes("application/json") &&
-    accept.includes("text/event-stream")
-  ) {
-    return request;
-  }
-
   const headers = new Headers(request.headers);
-  headers.set("accept", "application/json, text/event-stream");
-  // The body is a one-shot stream, so read it before rebuilding the request.
-  const body = await request.arrayBuffer();
+  if (
+    !accept.includes("application/json") ||
+    !accept.includes("text/event-stream")
+  ) {
+    headers.set("accept", "application/json, text/event-stream");
+  }
+  // `serveMcp` already consumed the original stream, so always rebuild.
   return new Request(request.url, { method: request.method, headers, body });
 }
 
@@ -113,26 +116,48 @@ async function withAcceptableHeaders(request: Request): Promise<Request> {
  *
  *  Lives here rather than in the route file so it can be tested directly. */
 export async function serveMcp(request: Request): Promise<Response> {
+  // Read the body ONCE here: it is a one-shot stream, and both the log line
+  // and the rebuilt request below need it.
+  const body = await request.text();
+  const started = Date.now();
+  const describe = describeRequest(request, body, isVerbose());
+
+  const done = (response: Response, reason?: string): Response => {
+    logMcp(
+      `${describe} ${describeOutcome(response.status, reason)} ${Date.now() - started}ms`,
+    );
+    return response;
+  };
+
   const expected = allowedHost();
   const host = request.headers.get("host");
   if (expected && host && host !== expected) {
-    return new Response("Forbidden", { status: 403, headers: MCP_CORS_HEADERS });
+    return done(
+      new Response("Forbidden", { status: 403, headers: MCP_CORS_HEADERS }),
+      `Host ${host} is not ${expected} (VITE_FRONTEND_URL)`,
+    );
   }
 
   const caller = await resolveBearerCaller(request.headers);
   if (caller.kind === "absent") {
-    return unauthorized(
-      request,
-      "Missing credentials. Connect with OAuth (claude.ai connector, or `/mcp` in Claude Code), or send `Authorization: Bearer ins_…` — create one in Insacco under API keys.",
+    return done(
+      unauthorized(
+        request,
+        "Missing credentials. Connect with OAuth (claude.ai connector, or `/mcp` in Claude Code), or send `Authorization: Bearer ins_…` — create one in Insacco under API keys.",
+      ),
+      "no bearer credential presented",
     );
   }
   if (caller.kind === "invalid") {
-    return unauthorized(request, "Invalid, expired or revoked credential.");
+    return done(
+      unauthorized(request, "Invalid, expired or revoked credential."),
+      "credential did not resolve (unknown, revoked or expired)",
+    );
   }
 
-  return withCors(
+  const response = withCors(
     await handleMcpRequest(
-      await withAcceptableHeaders(request),
+      withAcceptableHeaders(request, body),
       {
         // The tools call oRPC procedures, which resolve the caller from these
         // headers exactly as they would for any HTTP request.
@@ -141,5 +166,12 @@ export async function serveMcp(request: Request): Promise<Response> {
       },
       caller.userId,
     ),
+  );
+
+  return done(
+    response,
+    response.status >= 400
+      ? `MCP SDK refused it (user ${caller.userId} via ${caller.via})`
+      : `user ${caller.userId} via ${caller.via}`,
   );
 }

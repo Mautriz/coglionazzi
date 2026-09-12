@@ -792,7 +792,16 @@ Postgres + a `uploads` volume for assets.
   Accept literally contains both `application/json` and `text/event-stream`,
   so a client sending a wildcard, json-only, or nothing at all was refused and
   reported the server as unreachable. We run with `enableJsonResponse` and
-  always answer JSON, so widening this changes no reply we send. **Every response carries CORS**
+  always answer JSON, so widening this changes no reply we send.
+- **Every `/api/mcp` request is logged** (`server/mcp/log.ts`, unit-tested):
+  one `[mcp]` line with the JSON-RPC method, the Accept/User-Agent/Origin/Host
+  the client actually sent, whether a cookie came along, the outcome and WHY
+  it was refused. Connector UIs only ever say "couldn't reach" or
+  "authorization failed", so this log is the only diagnosis — read it with
+  `docker compose logs -f app | grep "\[mcp\]"`. Secrets never reach it: an
+  API key shows only its public `ins_` prefix, an OAuth token only its length,
+  a cookie only present/none, and tool params are never printed. Set
+  `MCP_LOG=verbose` to also dump every other non-secret header. **Every response carries CORS**
   (`MCP_CORS_HEADERS` + an `OPTIONS` handler): a connector configured inside a
   web app sends `Authorization` cross-origin, which forces a preflight, and
   without it the browser blocks the request and the server looks unreachable
