@@ -386,3 +386,67 @@ the whole flow was exercised against a running server — sign-up, key creation,
 with either a cookie or a key. The two security-critical route tests (cookies
 refused; no cross-user leakage) were mutation-tested to confirm they fail when
 the protection is removed.
+
+## Addendum (2026-09-12): OAuth for claude.ai connectors
+
+claude.ai custom connectors only speak OAuth, so API keys alone left the MCP
+server unreachable from claude.ai. Decision: make the app its own OAuth 2.1
+authorization server with better-auth's `mcp()` plugin, and keep API keys for
+scripts. Rejected: hand-rolling a mini OAuth server that mints API keys (~200
+lines of security-sensitive code), and the newer `@better-auth/oauth-provider`
+(needs the JWT plugin, a JWKS table and a consent page; same three DB tables,
+so switching later is config — `mcp()` is flagged "soon deprecated").
+
+**Identity model, unchanged:** there is no Claude user and no scope system.
+The person who signs in during the OAuth popup is who Claude acts as, with
+that person's team memberships. Want a narrower Claude? Sign in as a dedicated
+account that belongs to fewer teams.
+
+**What was built**
+- Plugin registered in `auth.ts` (`loginPage: /auth/login`, `resource:
+  <origin>/api/mcp`, 30-day access / 90-day refresh tokens, snake_case schema
+  map). Migration `1770000000013_oauth-provider` → `oauth_applications`,
+  `oauth_access_tokens`, `oauth_consents`.
+- Root discovery routes `routes/[.]well-known/oauth-authorization-server.ts`
+  and `…/oauth-protected-resource.ts` (the plugin's copies live under
+  `/api/auth/.well-known/`; clients look at the root).
+- `server/bearerAuth.ts` `resolveBearerCaller`: `ins_` → API key, anything
+  else → `auth.api.getMcpSession`. Used by `resolveSession` and
+  `resolveHttpCaller`; `/api/mcp` calls it and answers 401 with the RFC 9728
+  `WWW-Authenticate … resource_metadata=` challenge. Cookies still refused.
+- `lib/oauthLogin.ts` + login/sign-up pages: when the authorize query is
+  present, a successful login continues with a full navigation to
+  `/api/auth/mcp/authorize?…`; because the plugin's after-login hook may answer
+  the sign-in fetch with a cross-origin 302 (which fetch can't follow), an
+  error followed by "am I signed in? yes" is treated as success. Discord login
+  passes the authorize URL as its `callbackURL`. Both pages state plainly that
+  Claude will act as the account being used.
+- `ApiKeysDialog` shows the connector URL and the OAuth path for Claude Code;
+  keys are described as the option for scripts.
+
+**The consent screen was replaced by a redirect allowlist, not skipped.**
+Anonymous dynamic client registration plus no consent means a rogue client
+could otherwise mail a logged-in member an authorize link and collect a
+30-day token. `server/oauthRedirects.ts` (`isAllowedOAuthRedirect`, enforced
+by a `hooks.before` guard on `/mcp/register`) accepts only https URLs on
+claude.ai / claude.com and loopback — and refuses any URI containing a comma,
+because better-auth stores `redirect_uris.join(",")` and splits it back at
+authorize time, so a comma inside one entry would register an unchecked second
+target. Residual risk: a code can still be delivered to the victim's own
+loopback, which no third party can read.
+
+**Deliberately not built:** consent screen, scopes, a token-revocation UI,
+rate limiting on the public register/token endpoints (same posture as the
+public support widget).
+
+**Testing:** `test/oauth.test.ts` runs the full in-process dance (dynamic
+client registration → authorize with a session cookie → PKCE code exchange →
+`getMcpSession`), checks both discovery documents, the registration allowlist
+(including comma smuggling), the 30-day `expires_in`, and proves an OAuth
+token authenticates oRPC procedures and plain routes as its user, that an
+expired token is refused, and that a bad bearer never falls back to the
+cookie. `src/server/oauthRedirects.test.ts` unit-tests the allowlist.
+`test/mcpRoute.test.ts` covers the 401 challenge and tool calls with an OAuth
+token. The browser handoff was verified with curl against a running dev
+server: logged-out authorize → `/auth/login` + prompt cookie, sign-in → 302 to
+the client callback with a code, logged-in authorize → code directly.
