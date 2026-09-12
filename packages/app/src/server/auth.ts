@@ -15,6 +15,10 @@ const discordConfigured =
 // plugin below); the page continues the flow after sign-in.
 const OAUTH_LOGIN_PAGE = "/auth/login";
 
+/** How long an OAuth grant lives — ten years, i.e. "until revoked". See the
+ *  comment at `accessTokenExpiresIn` for why this is not left to refresh. */
+const OAUTH_TOKEN_LIFETIME_SECONDS = 60 * 60 * 24 * 365 * 10;
+
 export const auth = betterAuth({
   // Needed for server-side `auth.api.*` calls that build absolute URLs
   // without an incoming request. Inbound requests work as before.
@@ -74,11 +78,23 @@ export const auth = betterAuth({
         // `mcp()` overwrites this with the option above at runtime, but the
         // underlying OIDCOptions type marks it required — pass the same const.
         loginPage: OAUTH_LOGIN_PAGE,
-        // Long-lived on purpose: a connector that silently stops working after
-        // an hour is worse than a token that lives about as long as a session
-        // (API keys never expire at all).
-        accessTokenExpiresIn: 60 * 60 * 24 * 30,
-        refreshTokenExpiresIn: 60 * 60 * 24 * 90,
+        // Effectively forever, deliberately: a connector that silently stops
+        // working is the worst failure this feature has, and an API key — the
+        // other way in, with the same powers — never expires either.
+        //
+        // Refresh alone would NOT be enough to promise this. Refreshing does
+        // self-extend (the token endpoint rotates the refresh token and resets
+        // BOTH expiries), but the plugin only hands the client a refresh token
+        // when it asked for the `offline_access` scope, and whether a given MCP
+        // client asks is out of our hands. A long access token is the part that
+        // does not depend on the client's behaviour.
+        //
+        // The cost: unlike `api_keys`, these tokens are stored in clear and
+        // there is no revoke button yet, so a leaked one is good until the row
+        // is deleted (`delete from oauth_access_tokens where …`). Revoking is
+        // the natural next feature here.
+        accessTokenExpiresIn: OAUTH_TOKEN_LIFETIME_SECONDS,
+        refreshTokenExpiresIn: OAUTH_TOKEN_LIFETIME_SECONDS,
         // snake_case columns, like every other better-auth table (see the
         // `user`/`session`/`account` maps below and migration …013). The map
         // reaches the adapter through oidcProvider's in-place mergeSchema on

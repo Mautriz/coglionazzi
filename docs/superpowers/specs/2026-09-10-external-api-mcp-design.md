@@ -404,8 +404,15 @@ account that belongs to fewer teams.
 
 **What was built**
 - Plugin registered in `auth.ts` (`loginPage: /auth/login`, `resource:
-  <origin>/api/mcp`, 30-day access / 90-day refresh tokens, snake_case schema
-  map). Migration `1770000000013_oauth-provider` → `oauth_applications`,
+  <origin>/api/mcp`, ten-year tokens, snake_case schema map). Ten years rather
+  than a short lifetime plus refresh: refreshing self-extends (the token
+  endpoint rotates the refresh token and resets both expiries), but the plugin
+  only returns a refresh token to a client that requested `offline_access`, and
+  we cannot make a given MCP client ask. A connector that silently stops
+  working is the worst failure this feature has, and an API key — same powers,
+  same blast radius — never expires either. Cost: tokens are stored in clear
+  with no revoke button, so cutting one off means deleting its
+  `oauth_access_tokens` row. A revocation UI is the natural next feature. Migration `1770000000013_oauth-provider` → `oauth_applications`,
   `oauth_access_tokens`, `oauth_consents`.
 - Root discovery routes `routes/[.]well-known/oauth-authorization-server.ts`
   and `…/oauth-protected-resource.ts` (the plugin's copies live under
@@ -440,7 +447,8 @@ loopback, which no third party can read.
 PKCE is required (`requirePKCE`), and a test pins the property the whole model
 rests on: authorize refuses a `redirect_uri` the client never registered.
 
-**Deliberately not built:** consent screen, scopes, a token-revocation UI,
+**Deliberately not built:** consent screen, scopes, a token-revocation UI
+(now the top follow-up, given ten-year tokens),
 rate limiting on the public register/token endpoints (same posture as the
 public support widget).
 

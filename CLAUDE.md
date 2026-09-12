@@ -237,7 +237,14 @@ Postgres + a `uploads` volume for assets.
   (migration `…013`, snake_case via `oidcConfig.schema` — that map reaches the
   adapter through oidcProvider's in-place `mergeSchema`, and `oauth.test.ts`'s
   token exchange is the regression guard). Tokens are opaque and stored in
-  clear (unlike hashed API keys), 30-day access / 90-day refresh.
+  clear (unlike hashed API keys) and last TEN YEARS — effectively "until
+  revoked", because a connector that silently stops working is this feature's
+  worst failure and an API key never expires either. Refresh alone could not
+  promise that: refreshing does reset both expiries, but the plugin only
+  returns a refresh token when the client asked for `offline_access`, which is
+  the client's choice. There is no revoke button yet — deleting the
+  `oauth_access_tokens` row is how you cut a connector off, and a revocation UI
+  is the obvious next feature.
   **Whoever signs in during the OAuth popup is who the client acts as**, with
   that user's team memberships — there is no Claude user and no scope system;
   want a narrower Claude, sign in as an account in fewer teams.

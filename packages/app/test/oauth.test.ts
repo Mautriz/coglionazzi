@@ -71,7 +71,8 @@ describe("OAuth authorization server (better-auth mcp plugin)", () => {
     const token = await exchangeCode(clientId, code!, verifier);
     expect(token.access_token).toBeTruthy();
     expect(token.refresh_token).toBeTruthy();
-    expect(token.expires_in).toBe(60 * 60 * 24 * 30);
+    // Effectively forever — a connector must not silently stop working.
+    expect(token.expires_in).toBe(60 * 60 * 24 * 365 * 10);
 
     const grant = await auth.api.getMcpSession({
       headers: new Headers({ authorization: `Bearer ${token.access_token}` }),
