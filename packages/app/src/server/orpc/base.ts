@@ -1,5 +1,5 @@
 import { ORPCError, os } from "@orpc/server";
-import { bearerToken, resolveApiKey } from "../apiKeys";
+import { resolveBearerCaller } from "../bearerAuth";
 import {
   RequestHeadersPluginContext,
   ResponseHeadersPluginContext,
@@ -43,41 +43,40 @@ export async function getAuthSession(headers: HeadersInit) {
 
 /** Resolve the caller's session from whichever transport is in play:
  *  1. the WebSocket connection (auth fixed at upgrade),
- *  2. an `Authorization: Bearer ins_…` API key (external clients — bots and
- *     Claude Code over MCP),
+ *  2. an `Authorization: Bearer …` credential — an `ins_…` API key OR an
+ *     OAuth access token from the mcp plugin (external clients: bots, Claude
+ *     Code, claude.ai),
  *  3. the session cookie (HTTP/SSR via RequestHeadersPlugin).
  *
- *  Because every `authP` procedure reads `context.user`, adding the key branch
- *  HERE is what lets external callers use the whole API with no per-procedure
- *  changes. Returns null when unauthenticated.
+ *  Because every `authP` procedure reads `context.user`, adding the bearer
+ *  branch HERE is what lets external callers use the whole API with no
+ *  per-procedure changes. Returns null when unauthenticated.
  *
- *  An API-key caller has no better-auth session row, so `session` is null for
- *  them and `viaApiKey` says so. */
+ *  A bearer caller has no better-auth session row, so `session` is null for
+ *  them and `viaBearer` says so. */
 export async function resolveSession(context: ORPCContext): Promise<{
   user: AuthUser;
   session: AuthSession | null;
   headers: Headers | HeadersInit;
-  viaApiKey: boolean;
+  viaBearer: boolean;
 } | null> {
   if (context.connection?.user) {
     const { user, session, headers } = context.connection;
-    return { user, session, headers, viaApiKey: false };
+    return { user, session, headers, viaBearer: false };
   }
   if (!context.reqHeaders) return null;
 
   const headers = new Headers(context.reqHeaders as HeadersInit);
 
-  const token = bearerToken(headers);
-  if (token) {
-    const key = await resolveApiKey(token);
-    // A bearer token that looks like ours but doesn't resolve is a failed
-    // attempt, not an invitation to fall through to the cookie.
-    if (!key) return null;
-
-    const user = await userById(key.userId);
+  const bearer = await resolveBearerCaller(headers);
+  // A credential that was presented and failed is a failed attempt, not an
+  // invitation to fall through to the cookie.
+  if (bearer.kind === "invalid") return null;
+  if (bearer.kind === "ok") {
+    const user = await userById(bearer.userId);
     if (!user) return null;
 
-    return { user, session: null, headers, viaApiKey: true };
+    return { user, session: null, headers, viaBearer: true };
   }
 
   const { summary } = await getAuthSession(context.reqHeaders);
@@ -86,12 +85,12 @@ export async function resolveSession(context: ORPCContext): Promise<{
     user: summary.user,
     session: summary.session,
     headers,
-    viaApiKey: false,
+    viaBearer: false,
   };
 }
 
-/** Load the user an API key belongs to, shaped like better-auth's session
- *  user so downstream code can't tell the transports apart. */
+/** Load the user a bearer credential belongs to, shaped like better-auth's
+ *  session user so downstream code can't tell the transports apart. */
 async function userById(id: string): Promise<AuthUser | null> {
   const row = await db
     .selectFrom("users")

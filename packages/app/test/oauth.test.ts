@@ -1,16 +1,22 @@
+import { call } from "@orpc/server";
 import {
   oAuthDiscoveryMetadata,
   oAuthProtectedResourceMetadata,
 } from "better-auth/plugins";
 import { describe, expect, it } from "vitest";
 import { auth } from "../src/server/auth";
-import { signUpTestUser } from "./helpers";
+import { resolveHttpCaller } from "../src/server/httpCaller";
+import type { ORPCContext } from "../src/server/orpc/base";
+import { teamRouter } from "../src/server/orpc/teams";
+import { createTestTeam, signUpTestUser } from "./helpers";
 import {
   AUTH_ORIGIN,
   REDIRECT_URI,
   authorizeAs,
   cookieOf,
   exchangeCode,
+  expireOAuthToken,
+  mintOAuthToken,
   pkcePair,
   registerOAuthClient,
 } from "./oauthHelpers";
@@ -168,5 +174,55 @@ describe("OAuth discovery documents", () => {
 
     expect(meta.resource).toBe(`${AUTH_ORIGIN}/api/mcp`);
     expect(meta.authorization_servers).toEqual([AUTH_ORIGIN]);
+  });
+});
+
+const bearerContext = (token: string, extra: HeadersInit = {}): ORPCContext => ({
+  reqHeaders: new Headers({ authorization: `Bearer ${token}`, ...extra }),
+  resHeaders: new Headers(),
+});
+
+describe("OAuth access tokens as an auth transport", () => {
+  it("authenticates oRPC procedures as the token's user", async () => {
+    const { context } = await signUpTestUser("carol");
+    const teamId = await createTestTeam(context, "Carol's team");
+    const token = await mintOAuthToken(cookieOf(context));
+
+    const teams = await call(teamRouter.list, {}, { context: bearerContext(token) });
+
+    expect(teams.map((t) => t.id)).toContain(teamId);
+  });
+
+  it("refuses an expired token", async () => {
+    const { context } = await signUpTestUser("dave");
+    const token = await mintOAuthToken(cookieOf(context));
+    await expireOAuthToken(token);
+
+    await expect(
+      call(teamRouter.list, {}, { context: bearerContext(token) }),
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("does not fall back to the session cookie when the bearer token is bad", async () => {
+    const { context } = await signUpTestUser("erin");
+
+    await expect(
+      call(teamRouter.list, {}, {
+        context: bearerContext("not-a-real-token", { cookie: cookieOf(context) }),
+      }),
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("identifies plain-HTTP callers (files route) by OAuth token", async () => {
+    const { context, userId } = await signUpTestUser("frank");
+    const token = await mintOAuthToken(cookieOf(context));
+
+    const caller = await resolveHttpCaller(
+      new Request("http://localhost/api/files?fileId=x", {
+        headers: { authorization: `Bearer ${token}` },
+      }),
+    );
+
+    expect(caller).toEqual({ userId, via: "oauth" });
   });
 });
