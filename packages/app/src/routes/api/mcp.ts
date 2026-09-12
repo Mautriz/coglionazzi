@@ -1,12 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { serveMcp } from "../../server/mcp/route";
 
-/** MCP endpoint for external clients — above all Claude Code:
+/** MCP endpoint for external clients — claude.ai custom connectors and Claude
+ *  Code. Two ways in:
  *
- *    claude mcp add --transport http insacco <origin>/api/mcp \
- *      --header "Authorization: Bearer ins_..."
+ *    - OAuth (no key): add `<origin>/api/mcp` as a connector / run
+ *      `claude mcp add --transport http insacco <origin>/api/mcp` and log in
+ *      when prompted (better-auth's mcp plugin is the authorization server);
+ *    - API key: the same command with
+ *      `--header "Authorization: Bearer ins_..."`.
  *
- *  Authenticated by API key; the logic lives in `server/mcp/route.ts`. */
+ *  The logic lives in `server/mcp/route.ts`. */
 export const Route = createFileRoute("/api/mcp")({
   server: {
     handlers: {

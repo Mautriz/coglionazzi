@@ -77,8 +77,14 @@ describe("bearerToken", () => {
     expect(bearerToken(headers)).toBeNull();
   });
 
-  it("ignores a bearer token that is not one of ours", () => {
-    const headers = new Headers({ authorization: "Bearer github_pat_xyz" });
+  it("returns a bearer token that is not one of ours (OAuth tokens too)", () => {
+    const headers = new Headers({ authorization: "Bearer oauth_opaque_xyz" });
+
+    expect(bearerToken(headers)).toBe("oauth_opaque_xyz");
+  });
+
+  it("ignores an empty bearer token", () => {
+    const headers = new Headers({ authorization: "Bearer   " });
 
     expect(bearerToken(headers)).toBeNull();
   });

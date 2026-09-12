@@ -170,6 +170,44 @@ export interface GameSessions {
   winner_card_id: string | null;
 }
 
+export interface OauthAccessTokens {
+  access_token: string;
+  access_token_expires_at: Timestamp;
+  client_id: string;
+  created_at: Generated<Timestamp>;
+  id: string;
+  refresh_token: string | null;
+  refresh_token_expires_at: Timestamp | null;
+  scopes: string;
+  updated_at: Generated<Timestamp>;
+  user_id: string | null;
+}
+
+export interface OauthApplications {
+  client_id: string;
+  client_secret: string | null;
+  created_at: Generated<Timestamp>;
+  disabled: Generated<boolean>;
+  icon: string | null;
+  id: string;
+  metadata: string | null;
+  name: string | null;
+  redirect_urls: string;
+  type: string;
+  updated_at: Generated<Timestamp>;
+  user_id: string | null;
+}
+
+export interface OauthConsents {
+  client_id: string;
+  consent_given: boolean;
+  created_at: Generated<Timestamp>;
+  id: string;
+  scopes: string;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface Sessions {
   created_at: Timestamp;
   expires_at: Timestamp;
@@ -277,6 +315,9 @@ export interface DB {
   game_decks: GameDecks;
   game_session_players: GameSessionPlayers;
   game_sessions: GameSessions;
+  oauth_access_tokens: OauthAccessTokens;
+  oauth_applications: OauthApplications;
+  oauth_consents: OauthConsents;
   sessions: Sessions;
   support_categories: SupportCategories;
   support_tickets: SupportTickets;

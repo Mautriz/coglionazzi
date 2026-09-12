@@ -33,9 +33,10 @@ export function generateApiKey(): {
   };
 }
 
-/** Pull one of OUR bearer tokens out of an Authorization header. Returns null
- *  for a missing header, a different scheme, or a bearer token that isn't
- *  ours (so an unrelated credential is never hashed and looked up). */
+/** Pull the bearer token out of an Authorization header, whatever kind it is.
+ *  Returns null for a missing header or a different scheme. Deciding whether
+ *  it is one of our API keys (`ins_…`) or an OAuth access token is the job of
+ *  `resolveBearerCaller` (server/bearerAuth.ts). */
 export function bearerToken(headers: Headers): string | null {
   const header = headers.get("authorization");
   if (!header) return null;
@@ -44,9 +45,7 @@ export function bearerToken(headers: Headers): string | null {
   if (scheme.toLowerCase() !== "bearer") return null;
 
   const token = rest.join(" ").trim();
-  if (!token.startsWith(API_KEY_PREFIX)) return null;
-
-  return token;
+  return token.length > 0 ? token : null;
 }
 
 /** Resolve a token to its owner, or null when unknown or revoked. */

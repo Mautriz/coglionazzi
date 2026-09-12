@@ -16,11 +16,15 @@ import { rpc } from "~/lib/rpcClient";
 const appOrigin = (): string =>
   import.meta.env.VITE_FRONTEND_URL ?? window.location.origin;
 
-/** The one-liner that points Claude Code at this app. Keeping the whole
- *  command copyable (key included) is the point — connecting should be paste,
- *  not assembly. */
+/** The MCP endpoint. An OAuth client (claude.ai connector, Claude Code's
+ *  `/mcp` login) needs nothing but this URL. */
+const mcpUrl = (): string => `${appOrigin()}/api/mcp`;
+
+/** The one-liner that points Claude Code at this app with a KEY instead of a
+ *  login. Keeping the whole command copyable (key included) is the point —
+ *  connecting should be paste, not assembly. */
 const mcpCommand = (token: string): string =>
-  `claude mcp add --transport http insacco ${appOrigin()}/api/mcp --header "Authorization: Bearer ${token}"`;
+  `claude mcp add --transport http insacco ${mcpUrl()} --header "Authorization: Bearer ${token}"`;
 
 function CopyButton({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -85,10 +89,29 @@ export function ApiKeysDialog({ onClose }: { onClose: () => void }) {
           </DialogTitle>
         </DialogHeader>
 
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4">
+          <p className="text-sm font-medium">Connect Claude — no key needed</p>
+          <p className="text-xs text-muted-foreground">
+            Add this URL as a custom connector in claude.ai (Settings →
+            Connectors), or in Claude Code run{" "}
+            <code className="font-mono">
+              claude mcp add --transport http insacco {mcpUrl()}
+            </code>{" "}
+            and then <code className="font-mono">/mcp</code> to log in. You sign
+            in to Insacco once; Claude then acts as that account, in every team
+            it belongs to.
+          </p>
+          <code className="block overflow-x-auto rounded bg-muted px-3 py-2 font-mono text-xs">
+            {mcpUrl()}
+          </code>
+          <div>
+            <CopyButton value={mcpUrl()} label="Copy URL" />
+          </div>
+        </div>
+
         <p className="text-sm text-muted-foreground">
-          Keys let external tools reach Insacco — a chat bot, or Claude Code
-          over MCP. A key acts as <strong>you</strong>, in every team you
-          belong to.
+          API keys are for scripts and bots that can’t log in interactively. A
+          key acts as <strong>you</strong>, in every team you belong to.
         </p>
 
         {fresh ? (
@@ -108,7 +131,7 @@ export function ApiKeysDialog({ onClose }: { onClose: () => void }) {
 
             <div>
               <Label className="text-xs text-muted-foreground">
-                Add it to Claude Code
+                Use it from Claude Code (instead of logging in)
               </Label>
               <code className="mt-1 block overflow-x-auto rounded bg-muted px-3 py-2 font-mono text-xs whitespace-pre">
                 {mcpCommand(fresh.token)}

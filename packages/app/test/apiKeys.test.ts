@@ -72,7 +72,7 @@ describe("API keys as an oRPC identity", () => {
 
     const resolved = await resolveSession(keyContext(token));
 
-    expect(resolved?.viaApiKey).toBe(true);
+    expect(resolved?.viaBearer).toBe(true);
   });
 
   it("lets a key call an authenticated procedure as its owner", async () => {

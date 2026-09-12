@@ -77,22 +77,28 @@ packages/
         │   │   └── games/         # global Versus game: index (lobbies+decks),
         │   │                      #   decks/$deckId/{index editor, stats}, $sessionId play
         │   ├── widget.tsx        # public (no-auth) support widget — iframe content
+        │   ├── [.]well-known/     # ROOT OAuth discovery docs (bracket = escaped
+        │   │                      #   dot): oauth-authorization-server +
+        │   │                      #   oauth-protected-resource
         │   └── api/
         │       ├── auth/$.ts      # better-auth handler (GET/POST)
         │       ├── files.ts       # GET ?fileId= → streams an uploaded file (authed)
-        │       ├── mcp.ts         # POST → MCP server for Claude Code (API-key auth)
+        │       ├── mcp.ts         # POST → MCP server (API key OR OAuth token)
         │       ├── support/       # PUBLIC widget endpoints (config/tickets/messages/stream-SSE)
         │       └── rpc/$.ts       # oRPC RPCHandler (ANY), prefix /api/rpc
         ├── server/                # server-only code
         │   ├── db.ts              # pg Pool + Kysely instance + dialect
         │   ├── dbtypes.ts         # DB types (regenerate: npm run genDbTypes)
-        │   ├── auth.ts            # betterAuth() config + snake_case field maps
+        │   ├── auth.ts            # betterAuth() config + snake_case maps + mcp()
+        │   │                      #   OAuth server + /mcp/register redirect guard
         │   ├── ws/
         │   │   └── rpcHandler.ts  # crossws WS handler: upgrade auth + 5-min re-check
         │   ├── files.ts           # disk storage; optimizes images on upload (sharp)
         │   ├── fileAccess.ts      # assertFileAccess + delete-when-unreferenced
         │   ├── fileServe.ts       # GET /api/files logic (auth + authorize)
         │   ├── apiKeys.ts         # mint/hash/resolve API keys (ins_… bearer)
+        │   ├── bearerAuth.ts      # resolveBearerCaller: ins_ key OR OAuth token → user
+        │   ├── oauthRedirects.ts  # isAllowedOAuthRedirect (registration allowlist)
         │   ├── httpCaller.ts      # resolveHttpCaller for plain (non-oRPC) routes
         │   ├── mcp/               # route.ts, server.ts, tools.ts, render.ts
         │   ├── http.ts            # CORS + JSON/error helpers for the public support API
@@ -122,6 +128,7 @@ packages/
         │   ├── useChatRoom.ts     # open + live-stream a chat room (messages/reactions)
         │   ├── useGameSession.ts  # seed + live-stream a game session (presence/votes/state)
         │   ├── authClient.tsx     # better-auth react client
+        │   ├── oauthLogin.ts      # continue an OAuth authorize flow after login
         │   ├── theme.ts           # light/dark via class on <html>, localStorage
         │   └── classUtils.tsx     # cn()
         ├── components/
@@ -177,8 +184,11 @@ Postgres + a `uploads` volume for assets.
 - Local smoke-test without Traefik: add an override publishing the port
   (`ports: ["8090:3000"]`) and `docker network create dokploy-network`.
 - The MCP endpoint (see Conventions → External API) needs nothing extra: a plain
-  POST on the app's own port, authenticated by API key. `VITE_FRONTEND_URL` must
-  be the real public origin — the endpoint rejects a mismatched `Host`.
+  POST on the app's own port, authenticated by API key or OAuth.
+  `VITE_FRONTEND_URL` must be the real public origin — it is the OAuth
+  `issuer`, the base of every URL in the discovery documents, and the endpoint
+  rejects a mismatched `Host`. claude.ai can only reach a public HTTPS origin,
+  never localhost.
 - Realtime (see Conventions → Realtime) needs nothing extra: the WebSocket
   shares the app's port (`/api/rpc-ws`) and Traefik forwards upgrades by
   default. Keep it to ONE app replica — the event bus/presence live in
@@ -212,15 +222,59 @@ Postgres + a `uploads` volume for assets.
   they set the session cookie with Set-Cookie, which the WebSocket transport
   can't deliver, so they must NOT go through oRPC. The oRPC `auth` router is
   read-only (`getSession`).
-- **API keys are the third auth path** (external clients — see External API):
-  resolved in `resolveSession` alongside the cookie and the WS connection.
+- **Bearer credentials are the third auth path** (external clients — see
+  External API): an `ins_…` API key OR an OAuth access token minted by
+  better-auth's `mcp` plugin. Both resolve through ONE helper,
+  `resolveBearerCaller` (`server/bearerAuth.ts`), called by `resolveSession`
+  and `resolveHttpCaller`. A bearer that is present but FAILS never falls
+  through to the cookie (a failed credential is a failed attempt).
+- **OAuth server (`mcp()` plugin in `auth.ts`)**: makes the app the OAuth 2.1
+  authorization server that claude.ai connectors and Claude Code's `/mcp`
+  login need — dynamic client registration, PKCE (required — `requirePKCE`), authorize/token/refresh
+  under `/api/auth/mcp/*`, discovery docs under `/api/auth/.well-known/*` AND
+  at the site root (`routes/[.]well-known/`, where clients actually look).
+  Tables `oauth_applications` / `oauth_access_tokens` / `oauth_consents`
+  (migration `…013`, snake_case via `oidcConfig.schema` — that map reaches the
+  adapter through oidcProvider's in-place `mergeSchema`, and `oauth.test.ts`'s
+  token exchange is the regression guard). Tokens are opaque and stored in
+  clear (unlike hashed API keys) and last TEN YEARS — effectively "until
+  revoked", because a connector that silently stops working is this feature's
+  worst failure and an API key never expires either. Refresh alone could not
+  promise that: refreshing does reset both expiries, but the plugin only
+  returns a refresh token when the client asked for `offline_access`, which is
+  the client's choice. There is no revoke button yet — deleting the
+  `oauth_access_tokens` row is how you cut a connector off, and a revocation UI
+  is the obvious next feature.
+  **Whoever signs in during the OAuth popup is who the client acts as**, with
+  that user's team memberships — there is no Claude user and no scope system;
+  want a narrower Claude, sign in as an account in fewer teams.
+- **No consent screen — the redirect allowlist is what replaces it.**
+  Registration is anonymous and the plugin issues codes without consent, so a
+  `hooks.before` guard on `/mcp/register` (`auth.ts` + `isAllowedOAuthRedirect`
+  in `server/oauthRedirects.ts`) accepts only https URLs on claude.ai /
+  claude.com (EXACT host, no subdomains) and loopback, and refuses any URI
+  containing a comma — better-auth
+  stores `redirect_uris.join(",")` and splits it back, so a comma would smuggle
+  an unchecked second target. Adding an Anthropic callback host means editing
+  `OAUTH_REDIRECT_HOSTS`.
+- **Continuing an OAuth login:** a logged-out authorize bounces to
+  `/auth/login` with the whole authorize query attached;
+  `useOAuthContinueUrl()` (`lib/oauthLogin.ts`) spots it and, after a
+  successful email or Discord sign-in, hands the browser to
+  `/api/auth/mcp/authorize?…` with a FULL navigation (it 302s to another
+  origin). The plugin's after-login hook answers the sign-in fetch with that
+  302 itself; fetch follows it but cannot read the cross-origin response, so
+  both auth pages treat "error, but `getSession` now says signed in" as
+  success. That background fetch delivers one code and the navigation mints a
+  second — both to the registered URI, so it is safe, but a loopback client
+  that closes after the first leaves a dead tab behind a working connection.
 - better-auth maps camelCase fields to snake_case columns in
   `src/server/auth.ts` — new auth-related tables must follow that pattern.
 - **Discord OAuth** (optional): `socialProviders.discord` is registered only
   when `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` are set (so dev boots
   without them). The `<DiscordSignInButton>` (`components/custom/SocialAuth.tsx`)
   on both auth pages calls `authClient.signIn.social({provider:"discord",
-  callbackURL:"/home"})` — a FULL-PAGE redirect, so the page reloads fresh and
+  callbackURL})` — `/home` normally, the OAuth authorize URL mid-connector-flow — a FULL-PAGE redirect, so the page reloads fresh and
   the realtime socket re-upgrades on its own (NO `reconnectRealtimeSocket()`,
   unlike email login/signup). Redirect URL to register with Discord:
   `${VITE_FRONTEND_URL}/api/auth/callback/discord`.
@@ -681,11 +735,12 @@ Postgres + a `uploads` volume for assets.
   assignment, widget theming, email notifications, and spam rate-limiting on
   the public `POST tickets` (the widget key is public) — the first follow-up.
 
-### External API (API keys + MCP)
+### External API (API keys, OAuth + MCP)
 
 - **Purpose:** let things outside the browser reach the app — above all
   **Claude Code over MCP** (hand it a task; it reads the full context, does the
-  work, comments back). A hand-written bot could use the same keys over HTTP.
+  work, comments back) — from claude.ai as a custom connector (OAuth) or from
+  Claude Code (OAuth or API key). A hand-written bot uses a key over HTTP.
 - **API keys** (`api_keys`, migration `1770000000012_api-keys`): a key acts as
   its creating USER across every team they belong to — no per-team binding, no
   read/write split. Only the SHA-256 of the token is stored (`server/apiKeys.ts`):
@@ -696,19 +751,23 @@ Postgres + a `uploads` volume for assets.
   ONCE) and the `<ApiKeysDialog>` (key icon in `UserActions`), which shows the
   whole `claude mcp add` command ready to paste.
 - **The auth branch lives in ONE place.** `resolveSession` (`orpc/base.ts`) now
-  reconciles three transports: WS connection → `Authorization: Bearer ins_…`
-  → session cookie. Because every `authP` procedure reads `context.user`, key
+  reconciles three transports: WS connection → `Authorization: Bearer …`
+  (an API key or an OAuth access token, via `resolveBearerCaller`) → session
+  cookie. Because every `authP` procedure reads `context.user`, key
   callers get the whole API with **no per-procedure change**, and every
   `assertTeamMember` gate applies unchanged. Plain (non-oRPC) routes use
   `resolveHttpCaller` (`server/httpCaller.ts`), which has the same branch — add
-  new auth transports to those two functions, never per-route. An API-key
-  caller has no better-auth session row, so `session` is null and `viaApiKey`
+  new auth transports to those two functions, never per-route. A bearer
+  caller has no better-auth session row, so `session` is null and `viaBearer`
   is true. A bearer token that looks like ours but doesn't resolve FAILS rather
   than falling through to the cookie.
 - **MCP endpoint:** `POST /api/mcp` (`routes/api/mcp.ts` → `server/mcp/route.ts`,
-  directly tested). **API key ONLY — a browser session cookie is deliberately
-  refused**, or the endpoint would be reachable cross-site from a logged-in
-  user's browser. Also rejects a `Host` that isn't `VITE_FRONTEND_URL`'s
+  directly tested). **bearer credential ONLY (API key or OAuth access token) — a
+  browser session cookie is deliberately refused**, or the endpoint would be
+  reachable cross-site from a logged-in user's browser. A 401 carries
+  `WWW-Authenticate: Bearer … resource_metadata="<origin>/.well-known/oauth-protected-resource"`
+  (RFC 9728), which is how an OAuth client discovers the authorization server
+  and starts the login flow by itself. Also rejects a `Host` that isn't `VITE_FRONTEND_URL`'s
   (neither MCP SDK does DNS-rebinding defence). Uses the SDK's
   `WebStandardStreamableHTTPServerTransport` — pure Web Fetch
   (`handleRequest(Request): Promise<Response>`), no Node req/res adapter —
@@ -736,7 +795,8 @@ Postgres + a `uploads` volume for assets.
   5MB. Gated by the same `assertFileAccess` as the browser route.
 - Domain errors (`ORPCError`) are converted to MCP tool errors carrying the
   message, so a model sees `FORBIDDEN: …` and can act on it instead of a crash.
-- **Not built (deliberate):** rate limiting, key expiry, per-key scopes,
+- **Not built (deliberate):** rate limiting, key expiry, per-key/OAuth scopes,
+  an OAuth consent screen (the redirect allowlist stands in for it),
   API keys over WebSocket, MCP resources/prompts, and **OpenAPI** — the last is
   a cheap follow-up rather than a rewrite: `@orpc/openapi` v1.15's
   `OpenAPIHandler` takes a `filter`, so the same curated set becomes REST plus
@@ -848,7 +908,8 @@ Postgres + a `uploads` volume for assets.
 
 - Path alias: `~/*` (and `@/*`) → `packages/app/src/*`.
 - Server-only code goes under `src/server/` — never import it from
-  components (only `routes/api/*` and other server files may).
+  components. Route files may import it when they ARE the server handler:
+  `routes/api/*` and `routes/[.]well-known/*`.
 - `src/routeTree.gen.ts` is generated by the Start plugin — never edit it.
 - Env vars come from `packages/.env` (see `.env.example`). `VITE_`-prefixed
   ones are exposed to the client; secrets must NOT carry the prefix.

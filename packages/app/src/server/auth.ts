@@ -1,5 +1,8 @@
 import { betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
+import { mcp } from "better-auth/plugins";
 import { pool } from "./db";
+import { isAllowedOAuthRedirect } from "./oauthRedirects";
 
 const frontendUrl = process.env.VITE_FRONTEND_URL ?? "http://localhost:3300";
 
@@ -7,6 +10,14 @@ const frontendUrl = process.env.VITE_FRONTEND_URL ?? "http://localhost:3300";
 // present so the app still boots without them.
 const discordConfigured =
   !!process.env.DISCORD_CLIENT_ID && !!process.env.DISCORD_CLIENT_SECRET;
+
+// Where the OAuth authorize endpoint sends a logged-out user (see the mcp
+// plugin below); the page continues the flow after sign-in.
+const OAUTH_LOGIN_PAGE = "/auth/login";
+
+/** How long an OAuth grant lives — ten years, i.e. "until revoked". See the
+ *  comment at `accessTokenExpiresIn` for why this is not left to refresh. */
+const OAUTH_TOKEN_LIFETIME_SECONDS = 60 * 60 * 24 * 365 * 10;
 
 export const auth = betterAuth({
   // Needed for server-side `auth.api.*` calls that build absolute URLs
@@ -22,6 +33,114 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 8,
   },
+
+  hooks: {
+    // Dynamic client registration is anonymous and the mcp plugin issues codes
+    // without a consent screen, so the redirect_uri allowlist is the ONLY
+    // thing keeping a rogue client from harvesting codes via a shared link.
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/mcp/register") return;
+      const uris: unknown = ctx.body?.redirect_uris;
+      const list = Array.isArray(uris) ? uris : [];
+      const refused = list.filter(
+        (uri) => typeof uri !== "string" || !isAllowedOAuthRedirect(uri),
+      );
+      // The empty-list leg is load-bearing, NOT redundant: better-auth's zod
+      // schema is `z.array(z.string())` with no `.min(1)`, and its own
+      // emptiness check only fires for the authorization_code/implicit grant
+      // types — so `{grant_types:["client_credentials"], redirect_uris:[]}`
+      // would otherwise register a client with an empty redirect list.
+      if (list.length === 0 || refused.length > 0) {
+        throw new APIError("BAD_REQUEST", {
+          error: "invalid_redirect_uri",
+          error_description:
+            "redirect_uris must be https URLs on claude.ai / claude.com or loopback (localhost) URLs",
+        });
+      }
+    }),
+  },
+
+  plugins: [
+    // OAuth 2.1 authorization server for MCP clients that cannot send an API
+    // key — claude.ai custom connectors and Claude Code's `/mcp` login. A
+    // logged-out user is sent to OUR login page with the authorize query
+    // attached; the page continues the flow after sign-in (lib/oauthLogin.ts).
+    // Whoever signs in is the user the OAuth client acts as. No consent
+    // screen: for this friend group, logging in IS the consent.
+    mcp({
+      loginPage: OAUTH_LOGIN_PAGE,
+      // RFC 9728 resource identifier = the protected endpoint itself.
+      resource: `${frontendUrl}/api/mcp`,
+      oidcConfig: {
+        // MCP clients all use PKCE; requiring it means a code is useless to
+        // anyone who did not start the flow.
+        requirePKCE: true,
+        // `mcp()` overwrites this with the option above at runtime, but the
+        // underlying OIDCOptions type marks it required — pass the same const.
+        loginPage: OAUTH_LOGIN_PAGE,
+        // Effectively forever, deliberately: a connector that silently stops
+        // working is the worst failure this feature has, and an API key — the
+        // other way in, with the same powers — never expires either.
+        //
+        // Refresh alone would NOT be enough to promise this. Refreshing does
+        // self-extend (the token endpoint rotates the refresh token and resets
+        // BOTH expiries), but the plugin only hands the client a refresh token
+        // when it asked for the `offline_access` scope, and whether a given MCP
+        // client asks is out of our hands. A long access token is the part that
+        // does not depend on the client's behaviour.
+        //
+        // The cost: unlike `api_keys`, these tokens are stored in clear and
+        // there is no revoke button yet, so a leaked one is good until the row
+        // is deleted (`delete from oauth_access_tokens where …`). Revoking is
+        // the natural next feature here.
+        accessTokenExpiresIn: OAUTH_TOKEN_LIFETIME_SECONDS,
+        refreshTokenExpiresIn: OAUTH_TOKEN_LIFETIME_SECONDS,
+        // snake_case columns, like every other better-auth table (see the
+        // `user`/`session`/`account` maps below and migration …013). The map
+        // reaches the adapter through oidcProvider's in-place mergeSchema on
+        // the plugin's shared schema object (the mcp plugin itself returns that
+        // same object). If a better-auth upgrade ever stops mutating, queries
+        // would target camelCase names — oauth.test.ts's token-exchange test is
+        // the regression guard.
+        schema: {
+          oauthApplication: {
+            modelName: "oauth_applications",
+            fields: {
+              clientId: "client_id",
+              clientSecret: "client_secret",
+              redirectUrls: "redirect_urls",
+              userId: "user_id",
+              createdAt: "created_at",
+              updatedAt: "updated_at",
+            },
+          },
+          oauthAccessToken: {
+            modelName: "oauth_access_tokens",
+            fields: {
+              accessToken: "access_token",
+              refreshToken: "refresh_token",
+              accessTokenExpiresAt: "access_token_expires_at",
+              refreshTokenExpiresAt: "refresh_token_expires_at",
+              clientId: "client_id",
+              userId: "user_id",
+              createdAt: "created_at",
+              updatedAt: "updated_at",
+            },
+          },
+          oauthConsent: {
+            modelName: "oauth_consents",
+            fields: {
+              clientId: "client_id",
+              userId: "user_id",
+              consentGiven: "consent_given",
+              createdAt: "created_at",
+              updatedAt: "updated_at",
+            },
+          },
+        },
+      },
+    }),
+  ],
 
   socialProviders: discordConfigured
     ? {
