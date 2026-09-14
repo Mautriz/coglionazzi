@@ -846,10 +846,14 @@ Postgres + a `uploads` volume for assets.
   `chat_messages.body_text` (the search companion columns) already hold plain
   text. It needs `board.getCard` (added for this: one fully-nested card, the
   UI never needed it because it always has the whole board).
-- **`get_attachment`** returns an MCP **image content block** for images, so a
-  screenshot reaches the model's vision rather than arriving as a link; text
-  files come back as text, anything else is refused with a message. Capped at
-  5MB. Gated by the same `assertFileAccess` as the browser route.
+- **`get_attachment`** serves ANY file type. The mapping is pure
+  (`server/mcp/attachment.ts`, unit-tested): png/jpeg/gif/webp → an MCP
+  **image content block** (so a screenshot reaches the model's vision); bytes
+  that are valid UTF-8 with no NUL → text, decided by CONTENT not the declared
+  mime (uploads are often labelled `application/octet-stream`); everything
+  else (PDF, zip, tiff…) → a text summary + an **embedded resource** with the
+  base64 `blob`. Capped at 5MB. Gated by the same `assertFileAccess` as the
+  browser route.
 - Domain errors (`ORPCError`) are converted to MCP tool errors carrying the
   message, so a model sees `FORBIDDEN: …` and can act on it instead of a crash.
 - **Not built (deliberate):** rate limiting, key expiry, per-key/OAuth scopes,

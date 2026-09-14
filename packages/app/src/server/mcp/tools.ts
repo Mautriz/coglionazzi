@@ -5,13 +5,13 @@ import { fileService } from "../files";
 import { extractLexicalText, plainTextToLexical } from "../lexicalText";
 import type { ORPCContext } from "../orpc/base";
 import { appRouter } from "../orpc/router";
+import { attachmentContent, type AttachmentContent } from "./attachment";
 import { renderTask, renderTaskLine, type TaskComment } from "./render";
 
 /** MCP content blocks we emit. Text for everything readable; image blocks so a
- *  screenshot actually reaches the model's vision rather than as a link. */
-export type ToolContent =
-  | { type: "text"; text: string }
-  | { type: "image"; data: string; mimeType: string };
+ *  screenshot actually reaches the model's vision rather than as a link; an
+ *  embedded resource for any other file's raw bytes. */
+export type ToolContent = AttachmentContent;
 
 export interface ToolResult {
   content: ToolContent[];
@@ -241,7 +241,7 @@ const getAttachment = define({
   name: "get_attachment",
   title: "Read an attachment",
   description:
-    "Fetch an attachment's contents by the id get_task prints. Images come back as images you can actually look at; text files come back as text.",
+    "Fetch an attachment's contents by the id get_task prints. Works for any file type: images come back as images you can actually look at, text files (code, markdown, CSV, JSON, SVG…) as text, and anything else (PDF, zip, office documents…) as an embedded base64 resource with the file's mime type.",
   inputSchema: {
     attachmentId: z
       .string()
@@ -270,28 +270,15 @@ const getAttachment = define({
       };
     }
 
-    const bytes = Buffer.from(await fileService.readFile(file.path));
-
-    // SVG is text, and images the model can't decode are better read as text
-    // than handed over as an unusable blob.
-    if (type.startsWith("image/") && type !== "image/svg+xml") {
-      return {
-        content: [{ type: "image", data: bytes.toString("base64"), mimeType: type }],
-      };
-    }
-
-    if (type.startsWith("text/") || type === "image/svg+xml" || type === "application/json") {
-      return text(bytes.toString("utf8"));
-    }
+    const origin = process.env.VITE_FRONTEND_URL ?? "http://localhost:3300";
 
     return {
-      content: [
-        {
-          type: "text",
-          text: `${file.metadata.name} is ${type}, which can't be read as text or image.`,
-        },
-      ],
-      isError: true,
+      content: attachmentContent({
+        name: file.metadata.name ?? "file",
+        type,
+        uri: `${origin.replace(/\/$/, "")}/api/files?fileId=${encodeURIComponent(file.path)}`,
+        bytes: await fileService.readFile(file.path),
+      }),
     };
   },
 });

@@ -179,6 +179,31 @@ describe("get_attachment", () => {
     expect(textOf(result)).toContain("the spec body");
   });
 
+  it("returns any other file as an embedded base64 resource", async () => {
+    const { ctx, context } = await setup();
+    const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff, 0x10]);
+    const uploaded = await call(
+      appRouter.file.upload,
+      { file: new File([bytes], "bundle.zip", { type: "application/zip" }) },
+      { context },
+    );
+
+    const result = await runTool(
+      "get_attachment",
+      { attachmentId: uploaded.path },
+      ctx,
+    );
+
+    expect(result.isError).toBeFalsy();
+    const resource = result.content.find((block) => block.type === "resource");
+    expect(resource).toMatchObject({
+      resource: {
+        mimeType: "application/zip",
+        blob: Buffer.from(bytes).toString("base64"),
+      },
+    });
+  });
+
   it("refuses an attachment the caller cannot see", async () => {
     const { context } = await setup();
     const uploaded = await call(
